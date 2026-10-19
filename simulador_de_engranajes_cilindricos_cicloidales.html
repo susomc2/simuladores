@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Engranajes Cilíndricos con Perfil Cicloidal y Helicoidal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Range Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            background: #1e293b;
+            height: 6px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -6px;
+            background-color: #38bdf8;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background-color: #7dd3fc;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col lg:h-screen lg:overflow-hidden select-none">
+
+    <!-- Top Header -->
+    <header class="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <svg class="w-5 h-5 animate-spin" style="animation-duration: 12s;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <circle cx="12" cy="12" r="3" stroke-width="1.8"></circle>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-sm sm:text-base font-bold text-white tracking-tight">Simulador de Engranajes Cilíndricos — Perfil Cicloidal Exacto</h1>
+                <p class="text-xs text-slate-400">Generación matemática de caras epicicloidales, flancos hipocicloidales y torsión helicoidal en 3D</p>
+            </div>
+        </div>
+
+        <!-- Camera & Display Quick Actions -->
+        <div class="flex flex-wrap items-center gap-1.5">
+            <button id="btnViewIso" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 transition">
+                Vista Isométrica
+            </button>
+            <button id="btnViewFront" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition">
+                Vista Frontal (Engrane)
+            </button>
+            <button id="btnViewTop" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition">
+                Vista Superior (Hélice)
+            </button>
+            <button id="btnTogglePitch" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition">
+                Cilindros Primitivos: ON
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 overflow-y-auto lg:overflow-hidden">
+
+        <!-- Left Sidebar: Controls & Parameters -->
+        <aside class="lg:col-span-3 bg-slate-900/75 border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto">
+            
+            <!-- Sliders Card -->
+            <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-3.5 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-sky-400">Parámetros de Diseño</span>
+                    <span class="text-[11px] mono text-slate-400">mₙ = 3.0 mm</span>
+                </div>
+
+                <!-- z1 Slider -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="sliderZ1" class="text-slate-300 font-medium flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
+                            Dientes Conductor (<span class="mono">z₁</span>)
+                        </label>
+                        <span id="valZ1" class="mono font-semibold text-sky-400">16 dientes</span>
+                    </div>
+                    <input id="sliderZ1" type="range" min="8" max="40" step="1" value="16" class="w-full">
+                    <div class="flex justify-between text-[10px] text-slate-500 mono">
+                        <span>8</span><span>24</span><span>40</span>
+                    </div>
+                </div>
+
+                <!-- z2 Slider -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="sliderZ2" class="text-slate-300 font-medium flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+                            Dientes Conducido (<span class="mono">z₂</span>)
+                        </label>
+                        <span id="valZ2" class="mono font-semibold text-amber-400">28 dientes</span>
+                    </div>
+                    <input id="sliderZ2" type="range" min="8" max="60" step="1" value="28" class="w-full">
+                    <div class="flex justify-between text-[10px] text-slate-500 mono">
+                        <span>8</span><span>34</span><span>60</span>
+                    </div>
+                </div>
+
+                <!-- Helix Angle Beta Slider -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                        <label for="sliderBeta" class="text-slate-300 font-medium">
+                            Ángulo de Hélice (<span class="mono">β</span>)
+                        </label>
+                        <span id="valBeta" class="mono font-semibold text-emerald-400">20°</span>
+                    </div>
+                    <input id="sliderBeta" type="range" min="0" max="45" step="1" value="20" class="w-full">
+                    <div class="flex justify-between text-[10px] text-slate-500 mono">
+                        <span>0° (Recto)</span><span>22.5°</span><span>45° (Helicoidal)</span>
+                    </div>
+                </div>
+
+                <!-- Speed Slider (RPM1) -->
+                <div class="space-y-1.5 pt-1 border-t border-slate-800/80">
+                    <div class="flex justify-between text-xs">
+                        <label for="sliderRPM" class="text-slate-300 font-medium">
+                            Velocidad Conductor (<span class="mono">n₁</span>)
+                        </label>
+                        <span id="valRPM" class="mono font-semibold text-purple-400">30 RPM</span>
+                    </div>
+                    <input id="sliderRPM" type="range" min="-120" max="120" step="1" value="30" class="w-full">
+                    <div class="flex justify-between items-center text-[10px] text-slate-500 mono pt-0.5">
+                        <span>-120 RPM</span>
+                        <button id="btnStopRPM" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                            Parar (0)
+                        </button>
+                        <button id="btnInvertRPM" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                            Invertir Giro
+                        </button>
+                        <span>+120 RPM</span>
+                    </div>
+                </div>
+
+                <!-- Cycloidal Rolling Circle Ratio -->
+                <div class="space-y-1.5 pt-1 border-t border-slate-800/80">
+                    <div class="flex justify-between text-xs">
+                        <label for="sliderRoller" class="text-slate-300 font-medium" title="Radio de la ruleta generatriz expresado en módulos">
+                            Radio Ruleta Generatriz (<span class="mono">r_g / mₜ</span>)
+                        </label>
+                        <span id="valRoller" class="mono font-semibold text-cyan-400">2.20·mₜ</span>
+                    </div>
+                    <input id="sliderRoller" type="range" min="1.2" max="3.8" step="0.1" value="2.2" class="w-full">
+                    <p class="text-[11px] text-slate-400 leading-tight">
+                        Controla la curvatura de la <span class="text-cyan-400 font-medium">cara epicicloidal</span> y el <span class="text-amber-400 font-medium">flanco hipocicloidal</span>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Telemetry Panel -->
+            <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-3.5 space-y-2.5 flex-1">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Telemetría Cinemática y Geométrica</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Relación Transmisión (<span class="mono">i</span>)</div>
+                        <div id="telRatio" class="mono text-base font-bold text-white mt-0.5">1.75 : 1</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Módulo Aparente (<span class="mono">mₜ</span>)</div>
+                        <div id="telMt" class="mono text-base font-bold text-emerald-400 mt-0.5">3.19 mm</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Velocidad Salida (<span class="mono">n₂</span>)</div>
+                        <div id="telRPM2" class="mono text-sm font-bold text-amber-400 mt-0.5">-17.1 RPM</div>
+                        <div id="telOmega2" class="mono text-[10px] text-slate-400">-1.80 rad/s</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Velocidad Entrada (<span class="mono">n₁</span>)</div>
+                        <div id="telRPM1" class="mono text-sm font-bold text-sky-400 mt-0.5">30.0 RPM</div>
+                        <div id="telOmega1" class="mono text-[10px] text-slate-400">3.14 rad/s</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Diám. Primitivo 1 (<span class="mono">d₁</span>)</div>
+                        <div id="telD1" class="mono text-sm font-semibold text-sky-300 mt-0.5">51.08 mm</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-400 text-[11px]">Diám. Primitivo 2 (<span class="mono">d₂</span>)</div>
+                        <div id="telD2" class="mono text-sm font-semibold text-amber-300 mt-0.5">89.39 mm</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                    <div>
+                        <div class="text-slate-400 text-[11px]">Distancia entre Centros (<span class="mono">a</span>)</div>
+                        <div id="telCenterDist" class="mono text-sm font-bold text-white">70.24 mm</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-slate-400 text-[11px]">Factor Axial (<span class="mono">tan β</span>)</div>
+                        <div id="telAxial" class="mono text-sm font-semibold text-rose-400">0.364 Fₜ</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center 3D Viewport -->
+        <main class="lg:col-span-6 relative bg-slate-950 flex flex-col min-h-[420px] lg:min-h-0">
+            <!-- 3D Canvas Container -->
+            <div id="canvas3dContainer" class="flex-1 w-full h-full relative cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Floating 3D Legend Overlay -->
+            <div class="absolute top-3 left-3 pointer-events-none flex flex-col gap-1.5 bg-slate-900/85 backdrop-blur-md border border-slate-800 px-3 py-2 rounded-lg text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-sky-500 inline-block"></span>
+                    <span class="text-slate-200 font-medium">Piñón Conductor (<span class="mono">z₁</span>) — Hélice Derecha</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span>
+                    <span class="text-slate-200 font-medium">Rueda Conducida (<span class="mono">z₂</span>) — Hélice Izquierda</span>
+                </div>
+                <div class="text-[11px] text-slate-400 pt-0.5">
+                    Arrastra con el ratón para rotar en 3D • Rueda para Zoom
+                </div>
+            </div>
+
+            <!-- Bottom Center Distance Pill -->
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none bg-slate-900/90 backdrop-blur-md border border-slate-700/80 px-3.5 py-1.5 rounded-full text-xs flex items-center gap-3 shadow-lg">
+                <span class="text-slate-300">Punto Primitivo de Engrane: <strong class="mono text-emerald-400">(0, 0, 0)</strong></span>
+                <span class="text-slate-600">|</span>
+                <span class="text-slate-300">Tipo: <strong id="badgeGearType" class="text-sky-400">Cilíndrico Helicoidal</strong></span>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: 2D Epicycloidal / Hypocycloidal Tooth Inspector -->
+        <aside class="lg:col-span-3 bg-slate-900/75 border-l border-slate-800 p-4 flex flex-col gap-3 overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Inspector 2D de Perfil Cicloidal</h2>
+                    <p class="text-[11px] text-slate-400">Geometría transversal exacta de un diente</p>
+                </div>
+                <span class="px-2 py-0.5 text-[10px] mono rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Zoom Diente</span>
+            </div>
+
+            <!-- 2D Tooth Profile Canvas -->
+            <div class="relative w-full aspect-square bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-inner">
+                <canvas id="canvas2dProfile" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- Legend for Epicycloid & Hypocycloid Curves -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+                <div class="font-semibold text-slate-200 border-b border-slate-800 pb-1.5">
+                    Anatomía de la Curva del Diente
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="w-3 h-1 rounded bg-cyan-400 mt-1.5 shrink-0"></span>
+                    <div>
+                        <span class="text-cyan-300 font-semibold">Cara del Diente (Cabeza / Addendum):</span>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            Curva <strong>epicicloide exacta</strong> trazada por la ruleta generatriz rodando por el exterior de la circunferencia primitiva. Garantiza la forma convexa suave de las caras.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="w-3 h-1 rounded bg-amber-400 mt-1.5 shrink-0"></span>
+                    <div>
+                        <span class="text-amber-300 font-semibold">Flanco del Diente (Pie / Dedendum):</span>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            Curva <strong>hipocicloide exacta</strong> generada por la ruleta rodando por el interior de la circunferencia primitiva hasta el fondo (<span class="mono">r_f</span>).
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[11px] text-slate-400">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-0.5 bg-emerald-400 inline-block"></span> Circ. Primitiva (<span class="mono">r_p</span>)
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2.5 h-0.5 bg-fuchsia-400 inline-block"></span> Ruleta (<span class="mono">r_g</span>)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Mathematical Formula Reference -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-[11px] space-y-1.5 text-slate-300">
+                <div class="font-semibold text-slate-200">Ecuaciones Paramétricas Aplicadas:</div>
+                <div class="mono text-[10px] bg-slate-900 p-2 rounded border border-slate-800 text-cyan-300 overflow-x-auto">
+                    x(θ) = (R + r_g)cos(θ) - r_g·cos(((R+r_g)/r_g)θ)<br>
+                    y(θ) = (R + r_g)sin(θ) - r_g·sin(((R+r_g)/r_g)θ)
+                </div>
+                <p class="text-slate-400 leading-normal">
+                    Al compartir el mismo radio de ruleta generatriz (<span class="mono">r_g</span>), la cara epicicloidal del conductor engrana de forma conjugada con el flanco hipocicloidal del conducido.
+                </p>
+            </div>
+        </aside>
+
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. ESTADO DE LA SIMULACIÓN Y PARÁMETROS DE INGENIERÍA
+        // ============================================================================
+        const state = {
+            z1: 16,               // Dientes del engranaje conductor
+            z2: 28,               // Dientes del engranaje conducido
+            betaDeg: 20,          // Ángulo de hélice en grados
+            rpm1: 30,             // Velocidad del conductor en RPM
+            mn: 3.0,              // Módulo normal (mm)
+            faceWidth: 26.0,      // Ancho de cara b (mm)
+            rollerFactor: 2.2,    // Factor de radio de la ruleta generatriz (r_g = rollerFactor * mt)
+            showPitchCylinders: true,
+            phase1: 0,            // Ángulo acumulado del conductor (rad)
+            rollerAnimPhase: 0    // Fase para animar la ruleta en el inspector 2D
+        };
+
+        // ============================================================================
+        // 2. GENERADOR MATEMÁTICO DE PERFIL CICLOIDAL EXACTO (EPICICLOIDE + HIPOCICLOIDE)
+        // ============================================================================
+        /**
+         * Calcula la intersección o parámetro theta máximo de una epicicloide o hipocicloide
+         * para alcanzar un radio objetivo rTarget desde el centro del engranaje.
+         */
+        function solveCycloidThetaForRadius(R, rg, rTarget, isEpicycloid) {
+            // Búsqueda binaria monótona en la primera mitad de revolución de la ruleta
+            let low = 0.0;
+            // Cuando el ángulo de la ruleta phi = (R/rg)*theta llega a PI, alcanza la cúspide máxima/mínima
+            let high = (rg / R) * Math.PI * 0.95;
+
+            for (let iter = 0; iter < 28; iter++) {
+                const mid = 0.5 * (low + high);
+                let x, y;
+                if (isEpicycloid) {
+                    const k = (R + rg) / rg;
+                    x = (R + rg) * Math.cos(mid) - rg * Math.cos(k * mid);
+                    y = (R + rg) * Math.sin(mid) - rg * Math.sin(k * mid);
+                } else {
+                    const k = (R - rg) / rg;
+                    x = (R - rg) * Math.cos(mid) + rg * Math.cos(k * mid);
+                    y = (R - rg) * Math.sin(mid) - rg * Math.sin(k * mid);
+                }
+                const r = Math.hypot(x, y);
+                if (isEpicycloid) {
+                    if (r < rTarget) low = mid;
+                    else high = mid;
+                } else {
+                    if (r > rTarget) low = mid;
+                    else high = mid;
+                }
+            }
+            return 0.5 * (low + high);
+        }
+
+        /**
+         * Evalúa un punto (x, y) y su ángulo polar sobre la curva epicicloide o hipocicloide
+         * que parte en (R, 0) para theta = 0.
+         */
+        function evaluateCycloidPoint(R, rg, theta, isEpicycloid) {
+            let x, y;
+            if (isEpicycloid) {
+                const k = (R + rg) / rg;
+                x = (R + rg) * Math.cos(theta) - rg * Math.cos(k * theta);
+                y = (R + rg) * Math.sin(theta) - rg * Math.sin(k * theta);
+            } else {
+                const k = (R - rg) / rg;
+                x = (R - rg) * Math.cos(theta) + rg * Math.cos(k * theta);
+                y = (R - rg) * Math.sin(theta) - rg * Math.sin(k * theta);
+            }
+            return {
+                r: Math.hypot(x, y),
+                alpha: Math.atan2(y, x)
+            };
+        }
+
+        /**
+         * Genera los puntos 2D de un diente completo (y de toda la rueda dentada)
+         * con flanco hipocicloidal exacto y cara epicicloidal exacta.
+         * El diente índice 0 está centrado en el eje +X (ángulo 0).
+         */
+        function generateCycloidalGearProfile2D(z, mt, rollerFactor) {
+            const R = 0.5 * z * mt;             // Radio primitivo (r_p)
+            const ra = R + 1.0 * mt;            // Radio de cabeza / addendum (r_a)
+            const rf = Math.max(R - 1.25 * mt, R * 0.55); // Radio de pie / dedendum (r_f)
+
+            // Radio de la ruleta generatriz
+            const rgEpi = rollerFactor * mt;
+            // Para la hipocicloide, limitamos rgHypo <= 0.48 * R para evitar degeneración o lazo interno
+            const rgHypo = Math.min(rollerFactor * mt, 0.46 * R);
+
+            // Semiespesor angular del diente en la circunferencia primitiva (con ligero juego para buen aspecto visual)
+            const pitchAngle = (2 * Math.PI) / z;
+            const halfToothAngle = (Math.PI / (2 * z)) * 0.96;
+
+            // Parámetros máximos de theta para alcanzar ra (cabeza) y rf (pie)
+            const thetaMaxEpi = solveCycloidThetaForRadius(R, rgEpi, ra, true);
+            const thetaMaxHypo = solveCycloidThetaForRadius(R, rgHypo, rf, false);
+
+            const numSamplesFlank = 10; // Puntos en el flanco hipocicloidal
+            const numSamplesFace = 14;  // Puntos en la cara epicicloidal (alta resolución para ver la curvatura convexa)
+            const numSamplesTip = 4;    // Arco de cabeza
+            const numSamplesRoot = 4;   // Arco de fondo
+
+            // Construimos los puntos polares (r, angle) de UN diente centrado en ángulo = 0
+            // Recorrido en sentido antihorario:
+            // Fondo derecho -> Flanco derecho (hipocicloide) -> Punto primitivo derecho -> Cara derecha (epicicloide)
+            // -> Cabeza (addendum) -> Cara izquierda (epicicloide) -> Flanco izquierdo (hipocicloide) -> Fondo izquierdo
+            const singleToothPolar = [];
+
+            // Punto extremo del pie (dedendum) en el lado inferior/derecho
+            const rootEndPoint = evaluateCycloidPoint(R, rgHypo, thetaMaxHypo, false);
+            const rightRootAngle = -halfToothAngle - rootEndPoint.alpha;
+            const halfPitchAngle = pitchAngle / 2;
+
+            // 1. Arco en la circunferencia de fondo (desde -halfPitchAngle hasta el inicio del flanco derecho)
+            for (let i = 0; i < numSamplesRoot; i++) {
+                const t = i / numSamplesRoot;
+                const ang = -halfPitchAngle + t * (rightRootAngle - (-halfPitchAngle));
+                singleToothPolar.push({ r: rf, ang, zone: 'root' });
+            }
+
+            // 2. Flanco derecho (Hipocicloide desde r_f subiendo hasta r_p)
+            for (let i = 0; i <= numSamplesFlank; i++) {
+                const t = 1.0 - (i / numSamplesFlank);
+                const pt = evaluateCycloidPoint(R, rgHypo, t * thetaMaxHypo, false);
+                const ang = -halfToothAngle - pt.alpha;
+                singleToothPolar.push({ r: pt.r, ang, zone: 'hypo' });
+            }
+
+            // 3. Cara derecha (Epicicloide desde r_p subiendo hasta r_a, curvándose hacia el centro del diente)
+            const tipEndPoint = evaluateCycloidPoint(R, rgEpi, thetaMaxEpi, true);
+            // Nos aseguramos de que la punta no se cruce consigo misma si z es pequeño
+            const maxAllowedAlpha = halfToothAngle * 0.88;
+            const alphaScale = tipEndPoint.alpha > maxAllowedAlpha ? (maxAllowedAlpha / tipEndPoint.alpha) : 1.0;
+
+            for (let i = 1; i <= numSamplesFace; i++) {
+                const t = i / numSamplesFace;
+                const pt = evaluateCycloidPoint(R, rgEpi, t * thetaMaxEpi, true);
+                const ang = -halfToothAngle + pt.alpha * alphaScale;
+                singleToothPolar.push({ r: pt.r, ang, zone: 'epi' });
+            }
+
+            // 4. Arco de cabeza (Addendum land) entre lado derecho e izquierdo
+            const tipHalfAngle = Math.max(0.002, halfToothAngle - tipEndPoint.alpha * alphaScale);
+            for (let i = 1; i < numSamplesTip; i++) {
+                const t = i / numSamplesTip;
+                const ang = -tipHalfAngle + t * (2 * tipHalfAngle);
+                singleToothPolar.push({ r: ra, ang, zone: 'tip' });
+            }
+
+            // 5. Cara izquierda (Epicicloide desde r_a bajando hasta r_p)
+            for (let i = numSamplesFace; i >= 0; i--) {
+                const t = i / numSamplesFace;
+                const pt = evaluateCycloidPoint(R, rgEpi, t * thetaMaxEpi, true);
+                const ang = +halfToothAngle - pt.alpha * alphaScale;
+                singleToothPolar.push({ r: pt.r, ang, zone: 'epi' });
+            }
+
+            // 6. Flanco izquierdo (Hipocicloide desde r_p bajando hasta r_f)
+            for (let i = 1; i <= numSamplesFlank; i++) {
+                const t = i / numSamplesFlank;
+                const pt = evaluateCycloidPoint(R, rgHypo, t * thetaMaxHypo, false);
+                const ang = +halfToothAngle + pt.alpha;
+                singleToothPolar.push({ r: pt.r, ang, zone: 'hypo' });
+            }
+
+            // 7. Arco de fondo izquierdo (hasta +halfPitchAngle)
+            const leftRootAngle = +halfToothAngle + rootEndPoint.alpha;
+            for (let i = 1; i <= numSamplesRoot; i++) {
+                const t = i / numSamplesRoot;
+                const ang = leftRootAngle + t * (halfPitchAngle - leftRootAngle);
+                singleToothPolar.push({ r: rf, ang, zone: 'root' });
+            }
+
+            // Replicamos el perfil polar en los Z dientes alrededor de 360°
+            const fullGearVertices2D = [];
+            for (let tooth = 0; tooth < z; tooth++) {
+                const baseAngle = tooth * pitchAngle;
+                for (let j = 0; j < singleToothPolar.length; j++) {
+                    // Evitamos duplicar el último vértice con el primero del siguiente diente
+                    if (j === singleToothPolar.length - 1 && tooth < z - 1) continue;
+                    const p = singleToothPolar[j];
+                    const totalAngle = baseAngle + p.ang;
+                    fullGearVertices2D.push({
+                        x: p.r * Math.cos(totalAngle),
+                        y: p.r * Math.sin(totalAngle),
+                        r: p.r,
+                        ang: totalAngle
+                    });
+                }
+            }
+
+            return {
+                R, ra, rf, rgEpi, rgHypo,
+                halfToothAngle,
+                singleToothPolar,
+                fullGearVertices2D
+            };
+        }
+
+        // ============================================================================
+        // 3. GENERADOR DE MALLA 3D HELICOIDAL (THREE.JS BUFFERGEOMETRY)
+        // ============================================================================
+        /**
+         * Construye un BufferGeometry 3D extruyendo el contorno cicloidal a lo largo
+         * del ancho de cara `b` con torsión helicoidal phi(z) = z * tan(beta) / R,
+         * incluyendo agujero central (bore) para un acabado mecánico realista.
+         */
+        function createHelicalCycloidalGearGeometry(z, mt, betaRad, faceWidth, rollerFactor, handSign) {
+            const profile = generateCycloidalGearProfile2D(z, mt, rollerFactor);
+            const outerPts = profile.fullGearVertices2D;
+            const N = outerPts.length;
+            const R = profile.R;
+            const rBore = Math.max(4.5, Math.min(profile.rf * 0.42, 18.0)); // Radio del eje central
+
+            const slices = 24; // Divisiones axiales para una hélice suave
+            const halfZ = faceWidth / 2;
+            const tanBeta = Math.tan(betaRad) * handSign;
+
+            const positions = [];
+            const normals = [];
+            const indices = [];
+
+            // Estructura de anillos por cada rebanada axial z:
+            // Anillo exterior (contorno dentado, N vértices) + Anillo interior (agujero del eje, N vértices)
+            for (let s = 0; s <= slices; s++) {
+                const t = s / slices;
+                const zPos = -halfZ + t * faceWidth;
+                // Ángulo de torsión helicoidal en la cota zPos
+                const twistAngle = (zPos * tanBeta) / R;
+                const cosT = Math.cos(twistAngle);
+                const sinT = Math.sin(twistAngle);
+
+                // Anillo exterior (dientes cicloidales)
+                for (let i = 0; i < N; i++) {
+                    const px = outerPts[i].x;
+                    const py = outerPts[i].y;
+                    const rx = px * cosT - py * sinT;
+                    const ry = px * sinT + py * cosT;
+                    positions.push(rx, ry, zPos);
+                    normals.push(0, 0, 1); // Se recalcularán con computeVertexNormals()
+                }
+
+                // Anillo interior (agujero del eje)
+                for (let i = 0; i < N; i++) {
+                    const ang = outerPts[i].ang + twistAngle;
+                    const bx = rBore * Math.cos(ang);
+                    const by = rBore * Math.sin(ang);
+                    positions.push(bx, by, zPos);
+                    normals.push(0, 0, 1);
+                }
+            }
+
+            const stride = 2 * N; // Vértices por cada rebanada z
+
+            // 1. Caras laterales helicoidales de los dientes (Flancos y caras epicicloidales 3D)
+            for (let s = 0; s < slices; s++) {
+                const row0 = s * stride;
+                const row1 = (s + 1) * stride;
+                for (let i = 0; i < N; i++) {
+                    const iNext = (i + 1) % N;
+                    const a = row0 + i;
+                    const b = row0 + iNext;
+                    const c = row1 + iNext;
+                    const d = row1 + i;
+                    indices.push(a, b, c);
+                    indices.push(a, c, d);
+                }
+            }
+
+            // 2. Pared cilíndrica interior del agujero del eje
+            for (let s = 0; s < slices; s++) {
+                const row0 = s * stride + N;
+                const row1 = (s + 1) * stride + N;
+                for (let i = 0; i < N; i++) {
+                    const iNext = (i + 1) % N;
+                    const a = row0 + i;
+                    const b = row0 + iNext;
+                    const c = row1 + iNext;
+                    const d = row1 + i;
+                    indices.push(a, d, c);
+                    indices.push(a, c, b);
+                }
+            }
+
+            // 3. Tapa frontal (z = +halfZ) y Tapa trasera (z = -halfZ) con vértices duplicados para bordes nítidos
+            const frontCapStart = positions.length / 3;
+            const frontSliceOffset = slices * stride;
+            for (let i = 0; i < stride; i++) {
+                const idx3 = (frontSliceOffset + i) * 3;
+                positions.push(positions[idx3], positions[idx3 + 1], positions[idx3 + 2]);
+                normals.push(0, 0, 1);
+            }
+            for (let i = 0; i < N; i++) {
+                const iNext = (i + 1) % N;
+                const outA = frontCapStart + i;
+                const outB = frontCapStart + iNext;
+                const inA = frontCapStart + N + i;
+                const inB = frontCapStart + N + iNext;
+                indices.push(inA, outA, outB);
+                indices.push(inA, outB, inB);
+            }
+
+            const backCapStart = positions.length / 3;
+            for (let i = 0; i < stride; i++) {
+                const idx3 = i * 3;
+                positions.push(positions[idx3], positions[idx3 + 1], positions[idx3 + 2]);
+                normals.push(0, 0, -1);
+            }
+            for (let i = 0; i < N; i++) {
+                const iNext = (i + 1) % N;
+                const outA = backCapStart + i;
+                const outB = backCapStart + iNext;
+                const inA = backCapStart + N + i;
+                const inB = backCapStart + N + iNext;
+                indices.push(inA, outB, outA);
+                indices.push(inA, inB, outB);
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+
+            return { geometry, profile, rBore };
+        }
+
+        // ============================================================================
+        // 4. CONFIGURACIÓN DE LA ESCENA 3D (THREE.JS) Y CONTROLES DE CÁMARA
+        // ============================================================================
+        const container3D = document.getElementById('canvas3dContainer');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x090d16);
+
+        const camera = new THREE.PerspectiveCamera(42, 1, 1, 2000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container3D.appendChild(renderer.domElement);
+
+        // Iluminación de estudio de ingeniería para resaltar las caras epicicloidales
+        const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.55);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+        keyLight.position.set(80, 140, 160);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.55);
+        fillLight.position.set(-140, -80, 90);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xf59e0b, 0.45);
+        rimLight.position.set(40, 120, -140);
+        scene.add(rimLight);
+
+        // Rejilla de fondo sutil
+        const gridHelper = new THREE.GridHelper(360, 36, 0x1e293b, 0x0f172a);
+        gridHelper.position.y = -65;
+        scene.add(gridHelper);
+
+        // Materiales metálicos diferenciados para Conductor (Acero Azulado) y Conducido (Bronce/Latón)
+        const matDriver = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            metalness: 0.65,
+            roughness: 0.28
+        });
+
+        const matDriven = new THREE.MeshStandardMaterial({
+            color: 0xf59e0b,
+            metalness: 0.65,
+            roughness: 0.28
+        });
+
+        const matHubDark = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            metalness: 0.8,
+            roughness: 0.4
+        });
+
+        const matPitch1 = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.22
+        });
+
+        const matPitch2 = new THREE.MeshBasicMaterial({
+            color: 0xf59e0b,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.22
+        });
+
+        // Grupos para ambos engranajes
+        const gearGroup1 = new THREE.Group();
+        const gearGroup2 = new THREE.Group();
+        scene.add(gearGroup1);
+        scene.add(gearGroup2);
+
+        const pitchGroup = new THREE.Group();
+        scene.add(pitchGroup);
+
+        // Estado de cámara orbital personalizada
+        const camOrbit = {
+            theta: 0.35,        // Rotación horizontal (rad)
+            phi: 1.15,          // Inclinación vertical (rad)
+            radius: 210,        // Distancia al objetivo
+            target: new THREE.Vector3(0, 0, 0),
+            isDragging: false,
+            prevX: 0,
+            prevY: 0
+        };
+
+        function updateCameraPosition() {
+            const sinPhi = Math.sin(camOrbit.phi);
+            camera.position.x = camOrbit.target.x + camOrbit.radius * sinPhi * Math.sin(camOrbit.theta);
+            camera.position.y = camOrbit.target.y + camOrbit.radius * Math.cos(camOrbit.phi);
+            camera.position.z = camOrbit.target.z + camOrbit.radius * sinPhi * Math.cos(camOrbit.theta);
+            camera.lookAt(camOrbit.target);
+        }
+        updateCameraPosition();
+
+        // Eventos de ratón y táctiles para cámara 3D
+        container3D.addEventListener('mousedown', (e) => {
+            camOrbit.isDragging = true;
+            camOrbit.prevX = e.clientX;
+            camOrbit.prevY = e.clientY;
+        });
+        window.addEventListener('mouseup', () => { camOrbit.isDragging = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (!camOrbit.isDragging) return;
+            const dx = e.clientX - camOrbit.prevX;
+            const dy = e.clientY - camOrbit.prevY;
+            camOrbit.prevX = e.clientX;
+            camOrbit.prevY = e.clientY;
+            camOrbit.theta -= dx * 0.007;
+            camOrbit.phi = Math.max(0.08, Math.min(Math.PI - 0.08, camOrbit.phi - dy * 0.007));
+            updateCameraPosition();
+        });
+
+        container3D.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camOrbit.radius = Math.max(65, Math.min(480, camOrbit.radius + e.deltaY * 0.15));
+            updateCameraPosition();
+        }, { passive: false });
+
+        // Soporte táctil
+        container3D.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                camOrbit.isDragging = true;
+                camOrbit.prevX = e.touches[0].clientX;
+                camOrbit.prevY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+        window.addEventListener('touchend', () => { camOrbit.isDragging = false; });
+        window.addEventListener('touchmove', (e) => {
+            if (!camOrbit.isDragging || e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - camOrbit.prevX;
+            const dy = e.touches[0].clientY - camOrbit.prevY;
+            camOrbit.prevX = e.touches[0].clientX;
+            camOrbit.prevY = e.touches[0].clientY;
+            camOrbit.theta -= dx * 0.007;
+            camOrbit.phi = Math.max(0.08, Math.min(Math.PI - 0.08, camOrbit.phi - dy * 0.007));
+            updateCameraPosition();
+        }, { passive: true });
+
+        // ============================================================================
+        // 5. RECONSTRUCCIÓN DE ENGRANAJES Y TELEMETRÍA
+        // ============================================================================
+        let currentProfile1 = null;
+
+        function clearGroup(group) {
+            while (group.children.length > 0) {
+                const child = group.children[0];
+                if (child.geometry) child.geometry.dispose();
+                group.remove(child);
+            }
+        }
+
+        function rebuildGearsAndTelemetry() {
+            const z1 = state.z1;
+            const z2 = state.z2;
+            const betaRad = (state.betaDeg * Math.PI) / 180;
+            const mt = state.mn / Math.cos(betaRad);
+            const r1 = 0.5 * z1 * mt;
+            const r2 = 0.5 * z2 * mt;
+
+            // Limpiamos geometrías previas
+            clearGroup(gearGroup1);
+            clearGroup(gearGroup2);
+            clearGroup(pitchGroup);
+
+            // Construimos Engranaje Conductor (Izquierda, x = -r1, hélice derecha +1)
+            const g1Data = createHelicalCycloidalGearGeometry(z1, mt, betaRad, state.faceWidth, state.rollerFactor, +1);
+            currentProfile1 = g1Data.profile;
+            const mesh1 = new THREE.Mesh(g1Data.geometry, matDriver);
+            gearGroup1.add(mesh1);
+
+            // Eje metálico central para referencia de rotación
+            const shaft1Geo = new THREE.CylinderGeometry(g1Data.rBore * 0.98, g1Data.rBore * 0.98, state.faceWidth + 8, 24);
+            shaft1Geo.rotateX(Math.PI / 2);
+            const shaft1 = new THREE.Mesh(shaft1Geo, matHubDark);
+            gearGroup1.add(shaft1);
+
+            // Construimos Engranaje Conducido (Derecha, x = +r2, hélice izquierda -1)
+            const g2Data = createHelicalCycloidalGearGeometry(z2, mt, betaRad, state.faceWidth, state.rollerFactor, -1);
+            const mesh2 = new THREE.Mesh(g2Data.geometry, matDriven);
+            gearGroup2.add(mesh2);
+
+            const shaft2Geo = new THREE.CylinderGeometry(g2Data.rBore * 0.98, g2Data.rBore * 0.98, state.faceWidth + 8, 24);
+            shaft2Geo.rotateX(Math.PI / 2);
+            const shaft2 = new THREE.Mesh(shaft2Geo, matHubDark);
+            gearGroup2.add(shaft2);
+
+            // Posicionamos los centros para que el punto primitivo de contacto quede siempre en (0, 0, 0)
+            gearGroup1.position.set(-r1, 0, 0);
+            gearGroup2.position.set(+r2, 0, 0);
+
+            // Cilindros primitivos de referencia
+            if (state.showPitchCylinders) {
+                const cyl1Geo = new THREE.CylinderGeometry(r1, r1, state.faceWidth + 2, 48, 1, true);
+                cyl1Geo.rotateX(Math.PI / 2);
+                const cyl1 = new THREE.Mesh(cyl1Geo, matPitch1);
+                cyl1.position.set(-r1, 0, 0);
+                pitchGroup.add(cyl1);
+
+                const cyl2Geo = new THREE.CylinderGeometry(r2, r2, state.faceWidth + 2, 48, 1, true);
+                cyl2Geo.rotateX(Math.PI / 2);
+                const cyl2 = new THREE.Mesh(cyl2Geo, matPitch2);
+                cyl2.position.set(+r2, 0, 0);
+                pitchGroup.add(cyl2);
+            }
+
+            updateTelemetryUI();
+            draw2DCycloidalInspector();
+        }
+
+        function updateTelemetryUI() {
+            const z1 = state.z1;
+            const z2 = state.z2;
+            const betaRad = (state.betaDeg * Math.PI) / 180;
+            const mt = state.mn / Math.cos(betaRad);
+            const d1 = z1 * mt;
+            const d2 = z2 * mt;
+            const centerDist = 0.5 * (d1 + d2);
+            const ratio = z2 / z1;
+            const rpm1 = state.rpm1;
+            const rpm2 = -rpm1 * (z1 / z2);
+            const omega1 = (rpm1 * 2 * Math.PI) / 60;
+            const omega2 = (rpm2 * 2 * Math.PI) / 60;
+            const tanBeta = Math.tan(betaRad);
+
+            document.getElementById('valZ1').textContent = `${z1} dientes`;
+            document.getElementById('valZ2').textContent = `${z2} dientes`;
+            document.getElementById('valBeta').textContent = `${state.betaDeg}°`;
+            document.getElementById('valRPM').textContent = `${rpm1} RPM`;
+            document.getElementById('valRoller').textContent = `${state.rollerFactor.toFixed(2)}·mₜ`;
+
+            document.getElementById('telRatio').textContent = `${ratio.toFixed(2)} : 1`;
+            document.getElementById('telMt').textContent = `${mt.toFixed(2)} mm`;
+            document.getElementById('telRPM1').textContent = `${rpm1.toFixed(1)} RPM`;
+            document.getElementById('telOmega1').textContent = `${omega1.toFixed(2)} rad/s`;
+            document.getElementById('telRPM2').textContent = `${rpm2.toFixed(1)} RPM`;
+            document.getElementById('telOmega2').textContent = `${omega2.toFixed(2)} rad/s`;
+            document.getElementById('telD1').textContent = `${d1.toFixed(2)} mm`;
+            document.getElementById('telD2').textContent = `${d2.toFixed(2)} mm`;
+            document.getElementById('telCenterDist').textContent = `${centerDist.toFixed(2)} mm`;
+            document.getElementById('telAxial').textContent = `${tanBeta.toFixed(3)} Fₜ`;
+
+            const badgeType = document.getElementById('badgeGearType');
+            if (state.betaDeg === 0) {
+                badgeType.textContent = 'Cilíndrico de Dientes Rectos (β = 0°)';
+            } else {
+                badgeType.textContent = `Cilíndrico Helicoidal (β = ${state.betaDeg}°)`;
+            }
+        }
+
+        // ============================================================================
+        // 6. INSPECTOR 2D DE PERFIL CICLOIDAL (EPICICLOIDE + HIPOCICLOIDE + RULETA)
+        // ============================================================================
+        const canvas2D = document.getElementById('canvas2dProfile');
+        const ctx2D = canvas2D.getContext('2d');
+
+        function draw2DCycloidalInspector() {
+            if (!currentProfile1) return;
+            const rect = canvas2D.parentElement.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            if (canvas2D.width !== Math.floor(rect.width * dpr) || canvas2D.height !== Math.floor(rect.height * dpr)) {
+                canvas2D.width = Math.floor(rect.width * dpr);
+                canvas2D.height = Math.floor(rect.height * dpr);
+            }
+
+            const w = canvas2D.width;
+            const h = canvas2D.height;
+            ctx2D.save();
+            ctx2D.clearRect(0, 0, w, h);
+
+            const { R, ra, rf, rgEpi, singleToothPolar } = currentProfile1;
+            const toothHeight = ra - rf;
+
+            // Escalamos para enfocar de cerca un diente completo apuntando hacia arriba (+Y en pantalla)
+            const scale = (Math.min(w, h) * 0.42) / (toothHeight * 1.45);
+            // El punto primitivo del diente (r = R) se sitúa cerca del centro del canvas
+            const centerX = w * 0.5;
+            const centerY = h * 0.58 + R * scale;
+
+            // Función auxiliar para convertir coordenadas polares del diente (centrado en ang = 0) a pantalla (apuntando hacia arriba)
+            function toScreen(r, ang) {
+                const x = centerX + r * Math.sin(ang) * scale;
+                const y = centerY - r * Math.cos(ang) * scale;
+                return { x, y };
+            }
+
+            // 1. Dibujar arcos de referencia: Circunferencia de Cabeza (ra), Primitiva (R) y de Pie (rf)
+            const arcSpan = Math.PI / Math.max(6, state.z1 * 0.45);
+
+            // Circunferencia de Pie (Dedendum)
+            ctx2D.beginPath();
+            ctx2D.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            ctx2D.setLineDash([4 * dpr, 4 * dpr]);
+            ctx2D.lineWidth = 1.2 * dpr;
+            ctx2D.arc(centerX, centerY, rf * scale, -Math.PI / 2 - arcSpan, -Math.PI / 2 + arcSpan);
+            ctx2D.stroke();
+
+            // Circunferencia de Cabeza (Addendum)
+            ctx2D.beginPath();
+            ctx2D.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            ctx2D.arc(centerX, centerY, ra * scale, -Math.PI / 2 - arcSpan, -Math.PI / 2 + arcSpan);
+            ctx2D.stroke();
+
+            // Circunferencia Primitiva (r_p) en verde esmeralda
+            ctx2D.beginPath();
+            ctx2D.setLineDash([6 * dpr, 3 * dpr]);
+            ctx2D.strokeStyle = '#10b981';
+            ctx2D.lineWidth = 1.6 * dpr;
+            ctx2D.arc(centerX, centerY, R * scale, -Math.PI / 2 - arcSpan, -Math.PI / 2 + arcSpan);
+            ctx2D.stroke();
+            ctx2D.setLineDash([]);
+
+            // 2. Sombreado interior del diente cicloidal
+            ctx2D.beginPath();
+            singleToothPolar.forEach((p, idx) => {
+                const sc = toScreen(p.r, p.ang);
+                if (idx === 0) ctx2D.moveTo(sc.x, sc.y);
+                else ctx2D.lineTo(sc.x, sc.y);
+            });
+            ctx2D.lineTo(centerX, centerY);
+            ctx2D.closePath();
+            const grad = ctx2D.createLinearGradient(0, h * 0.15, 0, h * 0.9);
+            grad.addColorStop(0, 'rgba(56, 189, 248, 0.24)');
+            grad.addColorStop(1, 'rgba(15, 23, 42, 0.05)');
+            ctx2D.fillStyle = grad;
+            ctx2D.fill();
+
+            // 3. Trazar los segmentos del diente coloreados según su naturaleza matemática:
+            //    - Cara Epicicloidal (Addendum) en Cian brillante (#22d3ee)
+            //    - Flanco Hipocicloidal (Dedendum) en Ámbar brillante (#fbbf24)
+            //    - Cabeza y Fondo en Gris azulado (#94a3b8)
+            for (let i = 0; i < singleToothPolar.length - 1; i++) {
+                const p0 = singleToothPolar[i];
+                const p1 = singleToothPolar[i + 1];
+                const s0 = toScreen(p0.r, p0.ang);
+                const s1 = toScreen(p1.r, p1.ang);
+
+                ctx2D.beginPath();
+                ctx2D.moveTo(s0.x, s0.y);
+                ctx2D.lineTo(s1.x, s1.y);
+                ctx2D.lineWidth = 2.8 * dpr;
+                ctx2D.lineCap = 'round';
+
+                if (p1.zone === 'epi' || p0.zone === 'epi') {
+                    ctx2D.strokeStyle = '#22d3ee'; // Cara Epicicloidal
+                } else if (p1.zone === 'hypo' || p0.zone === 'hypo') {
+                    ctx2D.strokeStyle = '#fbbf24'; // Flanco Hipocicloidal
+                } else {
+                    ctx2D.strokeStyle = '#94a3b8'; // Cabeza o Fondo
+                }
+                ctx2D.stroke();
+            }
+
+            // 4. Visualización animada de la Ruleta Generatriz (círculo generador de la epicicloide)
+            const tOsc = 0.5 + 0.5 * Math.sin(state.rollerAnimPhase);
+            const thetaMax = solveCycloidThetaForRadius(R, rgEpi, ra, true);
+            const thetaCur = tOsc * thetaMax;
+            const halfTooth = currentProfile1.halfToothAngle;
+
+            // Centro de la ruleta rodando por el exterior de la circunferencia primitiva en la cara derecha
+            const rollerCenterAngle = halfTooth - thetaCur;
+            const rollerCenter = toScreen(R + rgEpi, rollerCenterAngle);
+
+            ctx2D.beginPath();
+            ctx2D.strokeStyle = 'rgba(232, 121, 249, 0.65)';
+            ctx2D.lineWidth = 1.4 * dpr;
+            ctx2D.arc(rollerCenter.x, rollerCenter.y, rgEpi * scale, 0, Math.PI * 2);
+            ctx2D.stroke();
+
+            // Punto exacto sobre la cara epicicloidal derecha que está trazando la ruleta en este instante
+            const tracedPt = evaluateCycloidPoint(R, rgEpi, thetaCur, true);
+            const maxAllowedAlpha = halfTooth * 0.88;
+            const tipEndPoint = evaluateCycloidPoint(R, rgEpi, thetaMax, true);
+            const alphaScale = tipEndPoint.alpha > maxAllowedAlpha ? (maxAllowedAlpha / tipEndPoint.alpha) : 1.0;
+            const tracedScreen = toScreen(tracedPt.r, halfTooth - tracedPt.alpha * alphaScale);
+
+            // Radio vector desde el centro de la ruleta hasta el punto trazado en la cara epicicloidal
+            ctx2D.beginPath();
+            ctx2D.strokeStyle = '#e879f9';
+            ctx2D.lineWidth = 1.5 * dpr;
+            ctx2D.moveTo(rollerCenter.x, rollerCenter.y);
+            ctx2D.lineTo(tracedScreen.x, tracedScreen.y);
+            ctx2D.stroke();
+
+            // Punto luminoso sobre la cara epicicloidal
+            ctx2D.beginPath();
+            ctx2D.fillStyle = '#f0abfc';
+            ctx2D.arc(tracedScreen.x, tracedScreen.y, 4 * dpr, 0, Math.PI * 2);
+            ctx2D.fill();
+
+            // Etiquetas en el inspector 2D
+            ctx2D.font = `600 ${11 * dpr}px Inter, sans-serif`;
+            ctx2D.fillStyle = '#22d3ee';
+            ctx2D.fillText('Cara Epicicloidal (Cabeza)', 12 * dpr, 20 * dpr);
+            ctx2D.fillStyle = '#fbbf24';
+            ctx2D.fillText('Flanco Hipocicloidal (Pie)', 12 * dpr, 36 * dpr);
+            ctx2D.fillStyle = '#e879f9';
+            ctx2D.fillText('Ruleta Generatriz (r_g)', 12 * dpr, 52 * dpr);
+
+            ctx2D.restore();
+        }
+
+        // ============================================================================
+        // 7. EVENTOS DE USUARIO Y CONTROLES INTERACTIVOS
+        // ============================================================================
+        document.getElementById('sliderZ1').addEventListener('input', (e) => {
+            state.z1 = parseInt(e.target.value, 10);
+            rebuildGearsAndTelemetry();
+        });
+
+        document.getElementById('sliderZ2').addEventListener('input', (e) => {
+            state.z2 = parseInt(e.target.value, 10);
+            rebuildGearsAndTelemetry();
+        });
+
+        document.getElementById('sliderBeta').addEventListener('input', (e) => {
+            state.betaDeg = parseFloat(e.target.value);
+            rebuildGearsAndTelemetry();
+        });
+
+        const sliderRPM = document.getElementById('sliderRPM');
+        sliderRPM.addEventListener('input', (e) => {
+            state.rpm1 = parseFloat(e.target.value);
+            updateTelemetryUI();
+        });
+
+        document.getElementById('btnStopRPM').addEventListener('click', () => {
+            state.rpm1 = 0;
+            sliderRPM.value = 0;
+            updateTelemetryUI();
+        });
+
+        document.getElementById('btnInvertRPM').addEventListener('click', () => {
+            state.rpm1 = state.rpm1 === 0 ? -30 : -state.rpm1;
+            sliderRPM.value = state.rpm1;
+            updateTelemetryUI();
+        });
+
+        document.getElementById('sliderRoller').addEventListener('input', (e) => {
+            state.rollerFactor = parseFloat(e.target.value);
+            rebuildGearsAndTelemetry();
+        });
+
+        // Botones de Vistas de Cámara
+        document.getElementById('btnViewIso').addEventListener('click', () => {
+            camOrbit.theta = 0.38;
+            camOrbit.phi = 1.12;
+            camOrbit.radius = 210;
+            updateCameraPosition();
+        });
+
+        document.getElementById('btnViewFront').addEventListener('click', () => {
+            camOrbit.theta = 0.0;
+            camOrbit.phi = Math.PI / 2;
+            camOrbit.radius = 195;
+            updateCameraPosition();
+        });
+
+        document.getElementById('btnViewTop').addEventListener('click', () => {
+            camOrbit.theta = 0.0;
+            camOrbit.phi = 0.08;
+            camOrbit.radius = 210;
+            updateCameraPosition();
+        });
+
+        const btnTogglePitch = document.getElementById('btnTogglePitch');
+        btnTogglePitch.addEventListener('click', () => {
+            state.showPitchCylinders = !state.showPitchCylinders;
+            btnTogglePitch.textContent = `Cilindros Primitivos: ${state.showPitchCylinders ? 'ON' : 'OFF'}`;
+            rebuildGearsAndTelemetry();
+        });
+
+        function handleResize() {
+            const rect = container3D.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                camera.aspect = rect.width / rect.height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(rect.width, rect.height);
+            }
+            draw2DCycloidalInspector();
+        }
+        window.addEventListener('resize', handleResize);
+
+        // ============================================================================
+        // 8. BUCLE PRINCIPAL DE ANIMACIÓN Y SINCRONIZACIÓN DE FASE ANGULAR
+        // ============================================================================
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            // Velocidad angular del conductor en rad/s
+            const omega1 = (state.rpm1 * 2 * Math.PI) / 60;
+            state.phase1 += omega1 * dt;
+
+            // Rotación del conductor alrededor del eje Z
+            gearGroup1.rotation.z = state.phase1;
+
+            // Sincronización exacta de fase para el engranaje conducido:
+            // En z = 0, el diente 0 del engranaje 1 apunta hacia +X (hacia el punto de contacto).
+            // El engranaje 2 tiene su centro en +r2, por lo que el punto de contacto está en su dirección -X (ángulo PI).
+            // Para que un vano del engranaje 2 reciba al diente 0 del engranaje 1 sin colisión,
+            // desfasamos PI + medio paso angular (PI / z2).
+            const meshOffset2 = Math.PI + (Math.PI / state.z2);
+            gearGroup2.rotation.z = meshOffset2 - state.phase1 * (state.z1 / state.z2);
+
+            // Animación continua de la ruleta generatriz en el inspector 2D
+            state.rollerAnimPhase += dt * 2.2;
+            draw2DCycloidalInspector();
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            rebuildGearsAndTelemetry();
+            handleResize();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación 3D: Piñón y Cremallera Cicloidal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+            user-select: none;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Estilos personalizados para deslizadores */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 9999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            border: 2px solid #f8fafc;
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #7dd3fc;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.84);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative">
+
+    <!-- Contenedor del Canvas 3D -->
+    <div id="canvas-container" class="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Barra Superior: Título y Vistas Rápidas -->
+    <header class="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-10">
+        <div class="glass-panel px-4 py-2.5 rounded-xl pointer-events-auto shadow-lg flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-sky-400 animate-pulse"></div>
+            <div>
+                <h1 class="text-sm md:text-base font-bold tracking-tight text-white">Mecanismo Piñón-Cremallera Cicloidal</h1>
+                <p class="text-xs text-slate-400">Engrane conjugado exacto • Sin desplazamiento axial ni desfase</p>
+            </div>
+        </div>
+
+        <div class="glass-panel p-1.5 rounded-xl pointer-events-auto shadow-lg flex items-center gap-1.5">
+            <button id="btn-view-front" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 transition">
+                Vista Frontal 2D (Inspección)
+            </button>
+            <button id="btn-view-3d" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+                Vista Perspectiva 3D
+            </button>
+            <button id="btn-view-zoom" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+                Zoom al Contacto (0,0)
+            </button>
+        </div>
+    </header>
+
+    <!-- Panel Izquierdo: Controles de Diseño y Cinemática -->
+    <aside class="absolute top-20 left-4 w-80 max-w-[calc(100vw-2rem)] glass-panel rounded-2xl p-4 shadow-2xl z-10 flex flex-col gap-4 max-h-[calc(100vh-6rem)] overflow-y-auto">
+        <div class="border-b border-slate-800 pb-2 flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-sky-400">Parámetros Geométricos</span>
+            <span class="text-[11px] text-slate-400 mono">Z-Plano = 0.0 mm</span>
+        </div>
+
+        <!-- Control: Número de dientes (Z) -->
+        <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-center">
+                <label for="slider-z" class="text-xs font-medium text-slate-200">Número de dientes del piñón (<span class="mono text-sky-400">Z</span>)</label>
+                <span id="val-z" class="mono text-sm font-bold text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/50">14</span>
+            </div>
+            <input id="slider-z" type="range" min="8" max="32" step="1" value="14">
+            <div class="flex justify-between text-[10px] text-slate-500 mono">
+                <span>8 dientes</span>
+                <span>20</span>
+                <span>32 dientes</span>
+            </div>
+        </div>
+
+        <!-- Control: Módulo (m) -->
+        <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-center">
+                <label for="slider-m" class="text-xs font-medium text-slate-200">Módulo métrico (<span class="mono text-amber-400">m</span>)</label>
+                <span id="val-m" class="mono text-sm font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/50">4.0 mm</span>
+            </div>
+            <input id="slider-m" type="range" min="2.5" max="6.0" step="0.5" value="4.0">
+            <div class="flex justify-between text-[10px] text-slate-500 mono">
+                <span>2.5 mm</span>
+                <span>4.0 mm</span>
+                <span>6.0 mm</span>
+            </div>
+        </div>
+
+        <!-- Control: Velocidad (RPM) -->
+        <div class="flex flex-col gap-1.5 pt-2 border-t border-slate-800">
+            <div class="flex justify-between items-center">
+                <label for="slider-rpm" class="text-xs font-medium text-slate-200">Velocidad de rotación (<span class="mono text-emerald-400">ω</span>)</label>
+                <span id="val-rpm" class="mono text-sm font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">15 RPM</span>
+            </div>
+            <input id="slider-rpm" type="range" min="-40" max="40" step="1" value="15">
+            <div class="flex justify-between text-[10px] text-slate-500 mono">
+                <span>-40 RPM (Izq.)</span>
+                <span>0</span>
+                <span>+40 RPM (Der.)</span>
+            </div>
+        </div>
+
+        <!-- Botones Rápidos de Cinemática -->
+        <div class="grid grid-cols-3 gap-2">
+            <button id="btn-pause" class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-center gap-1.5">
+                <span id="pause-icon">⏸</span> <span id="pause-text">Pausar</span>
+            </button>
+            <button id="btn-reverse" class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-center gap-1">
+                ⇄ Invertir
+            </button>
+            <button id="btn-reset-phase" class="px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-center gap-1" title="Alinear diente central en (0,0)">
+                ⌖ Fase 0°
+            </button>
+        </div>
+
+        <!-- Conmutadores de Referencia Visual -->
+        <div class="pt-2 border-t border-slate-800 flex flex-col gap-2">
+            <label class="flex items-center justify-between cursor-pointer group">
+                <span class="text-xs text-slate-300 group-hover:text-white transition">Círculo y línea primitiva + Ruleta</span>
+                <input id="chk-pitch" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+            </label>
+            <label class="flex items-center justify-between cursor-pointer group">
+                <span class="text-xs text-slate-300 group-hover:text-white transition">Auto-retorno suave en extremos</span>
+                <input id="chk-autobounce" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+            </label>
+        </div>
+    </aside>
+
+    <!-- Panel Derecho / Inferior: Telemetría en Tiempo Real -->
+    <section class="absolute bottom-4 right-4 left-4 md:left-auto md:w-96 glass-panel rounded-2xl p-4 shadow-2xl z-10 pointer-events-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Telemetría Cinemática</span>
+            <span id="status-badge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Engrane Sincronizado
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 text-xs">
+            <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800">
+                <div class="text-slate-400 text-[11px]">Radio Primitivo (<span class="mono">R<sub>p</sub></span>)</div>
+                <div id="out-rp" class="mono text-sm font-bold text-white mt-0.5">28.00 mm</div>
+            </div>
+            <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800">
+                <div class="text-slate-400 text-[11px]">Paso Circular (<span class="mono">p = π·m</span>)</div>
+                <div id="out-pitch" class="mono text-sm font-bold text-white mt-0.5">12.57 mm</div>
+            </div>
+            <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800">
+                <div class="text-slate-400 text-[11px]">Velocidad Lineal (<span class="mono">v = ω·R<sub>p</sub></span>)</div>
+                <div id="out-vel" class="mono text-sm font-bold text-emerald-400 mt-0.5">43.98 mm/s</div>
+            </div>
+            <div class="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800">
+                <div class="text-slate-400 text-[11px]">Diámetro Exterior (<span class="mono">D<sub>e</sub></span>)</div>
+                <div id="out-de" class="mono text-sm font-bold text-sky-300 mt-0.5">64.00 mm</div>
+            </div>
+        </div>
+
+        <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex justify-between items-center text-[11px] text-slate-400">
+            <span>Posición Cremallera (<span class="mono">x</span>): <strong id="out-x" class="mono text-slate-200">0.0 mm</strong></span>
+            <span>Ángulo Piñón (<span class="mono">φ</span>): <strong id="out-phi" class="mono text-slate-200">0.0°</strong></span>
+        </div>
+    </section>
+
+    <script>
+        // ============================================================================
+        // ESTADO GLOBAL DEL MECANISMO
+        // ============================================================================
+        const state = {
+            Z: 14,                  // Número de dientes del piñón
+            m: 4.0,                 // Módulo en mm
+            rpm: 15,                // Velocidad de rotación en RPM
+            extrudeDepth: 18.0,     // Espesor axial (eje Z) en mm (ambos centrados en Z=0)
+            paused: false,
+            showPitchRef: true,
+            autoBounce: true,
+            phi: 0.0,               // Ángulo acumulado de rotación del piñón (rad)
+            rackLimitTeeth: 6.5     // Límite de recorrido en pasos antes de invertir
+        };
+
+        // ============================================================================
+        // CONFIGURACIÓN DE ESCENA THREE.JS, CÁMARAS Y CONTROLES DE ÓRBITA MANUALES
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0b0f19);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 2000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Iluminación de estudio técnico
+        const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.65);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+        keyLight.position.set(70, 120, 140);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.5);
+        fillLight.position.set(-100, 40, 80);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xfbbf24, 0.45);
+        rimLight.position.set(0, -90, -100);
+        scene.add(rimLight);
+
+        // Materiales metálicos diferenciados de alto contraste
+        const pinionMaterial = new THREE.MeshStandardMaterial({
+            color: 0x94a3b8,
+            metalness: 0.78,
+            roughness: 0.26
+        });
+
+        const pinionHubMaterial = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            metalness: 0.65,
+            roughness: 0.4
+        });
+
+        const rackMaterial = new THREE.MeshStandardMaterial({
+            color: 0xd97706, // Bronce / Latón mecanizado
+            metalness: 0.72,
+            roughness: 0.28
+        });
+
+        const guideRailMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            metalness: 0.5,
+            roughness: 0.6
+        });
+
+        // Grupos jerárquicos para alineación exacta en X, Y, Z
+        const mechanismGroup = new THREE.Group();
+        scene.add(mechanismGroup);
+
+        // Grupo del piñón: su posición se actualiza a (0, Rp, 0) y su rotación Z es phi
+        const pinionGroup = new THREE.Group();
+        mechanismGroup.add(pinionGroup);
+
+        // Grupo de la cremallera: su posición Y=0, Z=0 es fija y su posición X es Rp * phi
+        const rackGroup = new THREE.Group();
+        mechanismGroup.add(rackGroup);
+
+        // Grupo de líneas primitivas, ruleta epicicloidal y punto de tangencia (0,0,0)
+        const overlayGroup = new THREE.Group();
+        mechanismGroup.add(overlayGroup);
+
+        // Rejilla de fondo sutil en Z = -extrudeDepth/2 - 6 para no interferir
+        const backGrid = new THREE.GridHelper(320, 32, 0x1e293b, 0x111827);
+        backGrid.rotation.x = Math.PI / 2;
+        backGrid.position.set(0, 20, -18);
+        scene.add(backGrid);
+
+        // ============================================================================
+        // GENERACIÓN MATEMÁTICA DEL PERFIL DEL DIENTE DEL PIÑÓN (EPICICLOIDAL LIMPIO)
+        // ============================================================================
+        /**
+         * Construye un THREE.Shape cerrado del piñón con Z dientes y módulo m.
+         * - Todos los puntos se calculan en coordenadas polares (r, angle) con 'angle'
+         *   estrictamente creciente alrededor de los 2*PI radianes, garantizando un
+         *   contorno limpio, convexo y libre de auto-intersecciones.
+         * - El diente i = 0 está centrado exactamente en theta = -Math.PI / 2 (apuntando
+         *   verticalmente hacia abajo), de modo que en phi = 0 engrana en el vano (x = 0)
+         *   de la cremallera.
+         */
+        function createCycloidalPinionShape(Z, m) {
+            const Rp = (m * Z) / 2.0;          // Radio primitivo
+            const Ra = Rp + 1.0 * m;           // Radio de cabeza (Addendum)
+            const Rf = Math.max(1.8 * m, Rp - 1.25 * m); // Radio de pie (Dedendum)
+
+            const deltaTheta = (2.0 * Math.PI) / Z;
+            // Semi-ángulo del diente sobre el círculo primitivo (con ligera holgura de engrane)
+            const halfToothAngle = (Math.PI / (2.0 * Z)) * 0.95;
+
+            // Semi-ángulo en la base del pie (dedendum): flanco hipocicloidal radial muy limpio
+            const rootHalfAngle = halfToothAngle * 1.08;
+            // Semi-ángulo en la cresta del diente (addendum)
+            const tipHalfAngle = halfToothAngle * 0.36;
+
+            // Perfil local de la mitad derecha de un diente: devuelve el offset angular positivo
+            // en función de la coordenada normalizada s en [0, 1] desde el fondo hasta la cresta
+            function getToothHalfAngleAtRadius(r) {
+                if (r <= Rp) {
+                    // Flanco de pie (Dedendum: Rf -> Rp): transición hipocicloidal suave
+                    const t = (r - Rf) / (Rp - Rf); // 0 en el fondo, 1 en el círculo primitivo
+                    // Curva suave con acuerdo en la raíz (root fillet)
+                    const fillet = Math.pow(1.0 - t, 2.2) * 0.08 * halfToothAngle;
+                    return halfToothAngle + (rootHalfAngle - halfToothAngle) * (1.0 - t) + fillet;
+                } else {
+                    // Flanco de cabeza (Addendum: Rp -> Ra): curva epicicloidal convexa auténtica
+                    const u = (r - Rp) / (Ra - Rp); // 0 en el círculo primitivo, 1 en la punta
+                    // La ley epicicloidal sale perpendicular al círculo primitivo (derivada suave en u=0)
+                    // y se curva progresivamente hacia la punta del diente:
+                    const epicycloidFactor = Math.pow(u, 1.45);
+                    return halfToothAngle - (halfToothAngle - tipHalfAngle) * epicycloidFactor;
+                }
+            }
+
+            const shape = new THREE.Shape();
+            const radialSteps = 10; // Puntos por cada flanco para suavidad visual en 3D
+            let firstPoint = true;
+
+            for (let i = 0; i < Z; i++) {
+                // El diente i = 0 apunta exactamente hacia abajo (-PI / 2)
+                const centerAngle = -Math.PI / 2.0 + i * deltaTheta;
+                const valleyStartAngle = centerAngle - deltaTheta / 2.0;
+                const valleyEndAngle = centerAngle + deltaTheta / 2.0;
+
+                const toothPoints = [];
+
+                // 1. Arco del fondo del vano izquierdo (en r = Rf)
+                const leftRootAngle = centerAngle - getToothHalfAngleAtRadius(Rf);
+                const valleyArcMidLeft = 0.5 * (valleyStartAngle + leftRootAngle);
+                toothPoints.push({ r: Rf, a: valleyStartAngle });
+                toothPoints.push({ r: Rf, a: valleyArcMidLeft });
+
+                // 2. Flanco izquierdo subiendo desde el pie (Rf) hasta la cabeza (Ra)
+                for (let s = 0; s <= radialSteps; s++) {
+                    const frac = s / radialSteps;
+                    // Muestreo más denso cerca del círculo primitivo y la cabeza
+                    const r = Rf + (Ra - Rf) * frac;
+                    const halfA = getToothHalfAngleAtRadius(r);
+                    toothPoints.push({ r: r, a: centerAngle - halfA });
+                }
+
+                // 3. Cresta superior del diente en r = Ra (ligeramente arqueada)
+                toothPoints.push({ r: Ra, a: centerAngle });
+
+                // 4. Flanco derecho bajando desde la cabeza (Ra) hasta el pie (Rf)
+                for (let s = radialSteps; s >= 0; s--) {
+                    const frac = s / radialSteps;
+                    const r = Rf + (Ra - Rf) * frac;
+                    const halfA = getToothHalfAngleAtRadius(r);
+                    toothPoints.push({ r: r, a: centerAngle + halfA });
+                }
+
+                // 5. Arco del fondo del vano derecho (en r = Rf)
+                const rightRootAngle = centerAngle + getToothHalfAngleAtRadius(Rf);
+                const valleyArcMidRight = 0.5 * (rightRootAngle + valleyEndAngle);
+                toothPoints.push({ r: Rf, a: valleyArcMidRight });
+
+                // Añadir los puntos cartesianos al THREE.Shape
+                for (let p of toothPoints) {
+                    const px = p.r * Math.cos(p.a);
+                    const py = p.r * Math.sin(p.a);
+                    if (firstPoint) {
+                        shape.moveTo(px, py);
+                        firstPoint = false;
+                    } else {
+                        shape.lineTo(px, py);
+                    }
+                }
+            }
+
+            shape.closePath();
+
+            // Taladro central (agujero para el eje con chavetero técnico)
+            const boreRadius = Math.max(2.2 * m, Math.min(Rp * 0.34, Rp - 2.4 * m));
+            const holePath = new THREE.Path();
+            holePath.absarc(0, 0, boreRadius, 0, Math.PI * 2, true);
+            shape.holes.push(holePath);
+
+            return { shape, Rp, Ra, Rf, boreRadius };
+        }
+
+        // ============================================================================
+        // GENERACIÓN MATEMÁTICA DE LA CREMALLERA CICLOIDAL CONJUGADA
+        // ============================================================================
+        /**
+         * Construye la sección transversal 2D de la cremallera:
+         * - Línea primitiva exactamente en y = 0.
+         * - Para x = 0 hay un VANO (valle) centrado en x = 0 (y = -1.25 * m),
+         *   para que el diente inferior del piñón (en x = 0, bajando hasta y = -1.0 * m)
+         *   encaje en fase perfecta.
+         * - Los dientes de la cremallera tienen sus centros en x = (k + 0.5) * p,
+         *   y sus flancos siguen una curva cicloidal conjugada que pasa por x = ±p/4 en y = 0.
+         */
+        function createCycloidalRackShape(m, numTeethSide) {
+            const p = Math.PI * m;             // Paso circular
+            const ha = 1.0 * m;                // Altura de cabeza de la cremallera (y = +m)
+            const hf = 1.25 * m;               // Profundidad del valle de la cremallera (y = -1.25m)
+            const baseBottomY = -3.6 * m;      // Base inferior de la barra de la cremallera
+
+            // Mitad del ancho del vano en y = 0 (con ligera holgura conjugada con el piñón)
+            const halfSpaceAtPitch = (p / 4.0) * 1.03;
+            // Mitad del ancho del fondo del valle en y = -hf
+            const halfValleyFloor = (p / 4.0) * 0.44;
+            // Mitad del ancho de la cresta del diente de la cremallera en y = +ha
+            const halfToothTip = (p / 4.0) * 0.42;
+
+            // Función auxiliar que devuelve la semianchura del hueco medida desde el centro del valle
+            function getValleyHalfWidthAtY(y) {
+                if (y <= 0) {
+                    // Parte inferior del vano (de y = -hf a y = 0): cicloide cóncava
+                    const u = (y - (-hf)) / hf; // 0 en el fondo del valle, 1 en la línea primitiva y=0
+                    const cycloidCurve = Math.pow(u, 0.72);
+                    return halfValleyFloor + (halfSpaceAtPitch - halfValleyFloor) * cycloidCurve;
+                } else {
+                    // Parte superior del diente de la cremallera (de y = 0 a y = +ha): cicloide convexa
+                    const u = y / ha; // 0 en la línea primitiva y=0, 1 en la cresta y=+ha
+                    const maxHalfGapAtTip = (p / 2.0) - halfToothTip;
+                    const cycloidCurve = Math.pow(u, 1.38);
+                    return halfSpaceAtPitch + (maxHalfGapAtTip - halfSpaceAtPitch) * cycloidCurve;
+                }
+            }
+
+            const shape = new THREE.Shape();
+            const minK = -numTeethSide;
+            const maxK = numTeethSide;
+            const leftMostX = (minK - 0.5) * p;
+            const rightMostX = (maxK + 0.5) * p;
+
+            // Esquina inferior izquierda de la barra
+            shape.moveTo(leftMostX, baseBottomY);
+            shape.lineTo(leftMostX, ha);
+
+            const flankSteps = 10;
+
+            // Recorrer cada valle k desde minK hasta maxK (en k = 0 el valle está exactamente en x = 0)
+            for (let k = minK; k <= maxK; k++) {
+                const valleyCenterX = k * p;
+
+                // Flanco izquierdo del valle k: baja desde la cresta izquierda (y = +ha) hasta el fondo (y = -hf)
+                for (let s = flankSteps; s >= 0; s--) {
+                    const frac = s / flankSteps;
+                    const y = -hf + (ha + hf) * frac;
+                    const halfW = getValleyHalfWidthAtY(y);
+                    shape.lineTo(valleyCenterX - halfW, y);
+                }
+
+                // Fondo plano/redondeado del valle en y = -hf
+                shape.lineTo(valleyCenterX + halfValleyFloor, -hf);
+
+                // Flanco derecho del valle k: sube desde el fondo (y = -hf) hasta la cresta derecha (y = +ha)
+                for (let s = 0; s <= flankSteps; s++) {
+                    const frac = s / flankSteps;
+                    const y = -hf + (ha + hf) * frac;
+                    const halfW = getValleyHalfWidthAtY(y);
+                    shape.lineTo(valleyCenterX + halfW, y);
+                }
+            }
+
+            // Cerrar la barra por el extremo derecho y la base inferior
+            shape.lineTo(rightMostX, ha);
+            shape.lineTo(rightMostX, baseBottomY);
+            shape.closePath();
+
+            return { shape, p, leftMostX, rightMostX, baseBottomY };
+        }
+
+        // ============================================================================
+        // RECONSTRUCCIÓN 3D Y ALINEACIÓN ESPACIAL EXACTA (Z = 0, Y = Rp)
+        // ============================================================================
+        function clearGroup(group) {
+            while (group.children.length > 0) {
+                const obj = group.children[0];
+                group.remove(obj);
+                if (obj.geometry) obj.geometry.dispose();
+            }
+        }
+
+        function rebuildMechanismGeometry() {
+            clearGroup(pinionGroup);
+            clearGroup(rackGroup);
+            clearGroup(overlayGroup);
+
+            const Z = state.Z;
+            const m = state.m;
+            const depth = state.extrudeDepth;
+
+            // 1. CONSTRUIR PIÑÓN Y CENTRARLO EN Z = 0
+            const { shape: pinionShape, Rp, Ra, Rf, boreRadius } = createCycloidalPinionShape(Z, m);
+
+            const extrudeSettings = {
+                depth: depth,
+                bevelEnabled: false,
+                curveSegments: 24
+            };
+
+            const pinionGeo = new THREE.ExtrudeGeometry(pinionShape, extrudeSettings);
+            // Crítico: centrar la extrusión en Z = 0 para que ocupe [-depth/2, +depth/2]
+            pinionGeo.translate(0, 0, -depth / 2.0);
+            pinionGeo.computeVertexNormals();
+
+            const pinionMesh = new THREE.Mesh(pinionGeo, pinionMaterial);
+            pinionMesh.castShadow = true;
+            pinionMesh.receiveShadow = true;
+            pinionGroup.add(pinionMesh);
+
+            // Eje central metálico e indicador radial del diente 0 (que apunta a -PI/2 en phi=0)
+            const shaftGeo = new THREE.CylinderGeometry(boreRadius * 0.98, boreRadius * 0.98, depth + 6, 32);
+            shaftGeo.rotateX(Math.PI / 2);
+            const shaftMesh = new THREE.Mesh(shaftGeo, pinionHubMaterial);
+            pinionGroup.add(shaftMesh);
+
+            // Marcador visual en el diente principal (diente i=0 que apunta hacia abajo en phi=0)
+            const markerGeo = new THREE.CylinderGeometry(m * 0.25, m * 0.25, depth + 0.6, 16);
+            markerGeo.rotateX(Math.PI / 2);
+            markerGeo.translate(0, -Rp * 0.68, 0);
+            const markerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            pinionGroup.add(new THREE.Mesh(markerGeo, markerMat));
+
+            // Posicionar el eje del piñón exactamente en (0, Rp, 0)
+            pinionGroup.position.set(0, Rp, 0);
+
+            // 2. CONSTRUIR CREMALLERA Y CENTRARLA EN Z = 0
+            const numTeethSide = 14;
+            const { shape: rackShape, leftMostX, rightMostX, baseBottomY } = createCycloidalRackShape(m, numTeethSide);
+
+            const rackGeo = new THREE.ExtrudeGeometry(rackShape, extrudeSettings);
+            // Crítico: centrar también la cremallera en Z = 0 para alineación coplanar perfecta
+            rackGeo.translate(0, 0, -depth / 2.0);
+            rackGeo.computeVertexNormals();
+
+            const rackMesh = new THREE.Mesh(rackGeo, rackMaterial);
+            rackMesh.castShadow = true;
+            rackMesh.receiveShadow = true;
+            rackGroup.add(rackMesh);
+
+            // Carril guía fijo inferior (situado justo debajo de la cremallera sin tapar los dientes)
+            const railHeight = 1.6 * m;
+            const railGeo = new THREE.BoxGeometry((rightMostX - leftMostX) * 1.15, railHeight, depth + 6);
+            const railMesh = new THREE.Mesh(railGeo, guideRailMaterial);
+            railMesh.position.set(0, baseBottomY - railHeight / 2.0 - 0.2, 0);
+            mechanismGroup.add(railMesh);
+            // Guardamos referencia dentro de overlayGroup para limpiarlo al reconstruir
+            mechanismGroup.remove(railMesh);
+            overlayGroup.add(railMesh);
+
+            // 3. LÍNEAS PRIMITIVAS Y CÍRCULOS DE REFERENCIA (en el plano frontal Z = +depth/2 + 0.4)
+            const refZ = depth / 2.0 + 0.35;
+            const pitchElements = new THREE.Group();
+            pitchElements.name = 'pitchReferences';
+
+            // Círculo primitivo del piñón (radio = Rp, centrado en (0, Rp))
+            const pitchCirclePts = [];
+            const segments = 128;
+            for (let i = 0; i <= segments; i++) {
+                const a = (i / segments) * Math.PI * 2;
+                pitchCirclePts.push(new THREE.Vector3(Rp * Math.cos(a), Rp + Rp * Math.sin(a), refZ));
+            }
+            const pitchCircleGeo = new THREE.BufferGeometry().setFromPoints(pitchCirclePts);
+            const pitchLineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+            pitchElements.add(new THREE.Line(pitchCircleGeo, pitchLineMat));
+
+            // Línea primitiva de la cremallera (recta horizontal exactamente en y = 0)
+            const rackPitchPts = [
+                new THREE.Vector3(leftMostX, 0, refZ),
+                new THREE.Vector3(rightMostX, 0, refZ)
+            ];
+            const rackPitchGeo = new THREE.BufferGeometry().setFromPoints(rackPitchPts);
+            const rackPitchMat = new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 });
+            pitchElements.add(new THREE.Line(rackPitchGeo, rackPitchMat));
+
+            // Círculos generadores (ruletas cicloidales de radio rg = 1.4 * m tangentes en (0,0))
+            const rg = 1.4 * m;
+            const genCirclePts1 = [];
+            const genCirclePts2 = [];
+            for (let i = 0; i <= 64; i++) {
+                const a = (i / 64) * Math.PI * 2;
+                genCirclePts1.push(new THREE.Vector3(rg * Math.cos(a), rg + rg * Math.sin(a), refZ));
+                genCirclePts2.push(new THREE.Vector3(rg * Math.cos(a), -rg + rg * Math.sin(a), refZ));
+            }
+            const genMat = new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.65 });
+            pitchElements.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(genCirclePts1), genMat));
+            pitchElements.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(genCirclePts2), genMat));
+
+            // Punto de tangencia primitiva o polo de engrane (0, 0, refZ)
+            const pitchPointGeo = new THREE.SphereGeometry(m * 0.22, 16, 16);
+            const pitchPointMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+            const pitchPointMesh = new THREE.Mesh(pitchPointGeo, pitchPointMat);
+            pitchPointMesh.position.set(0, 0, refZ);
+            pitchElements.add(pitchPointMesh);
+
+            pitchElements.visible = state.showPitchRef;
+            overlayGroup.add(pitchElements);
+
+            // Actualizar cinemática y telemetría inmediatamente
+            updateKinematicsTransform();
+            updateTelemetryUI();
+        }
+
+        // ============================================================================
+        // SINCRONIZACIÓN CINEMÁTICA EXACTA (PIÑÓN <-> CREMALLERA)
+        // ============================================================================
+        function updateKinematicsTransform() {
+            const Rp = (state.m * state.Z) / 2.0;
+
+            // Rotación del piñón alrededor de su eje Z:
+            // Cuando phi > 0 (giro antihorario), el diente inferior (en theta = -PI/2)
+            // se desplaza hacia la derecha (+X) a razón de dx = Rp * phi.
+            pinionGroup.rotation.z = state.phi;
+
+            // Posición horizontal de la cremallera exactamente acoplada: x = Rp * phi
+            rackGroup.position.set(Rp * state.phi, 0, 0);
+        }
+
+        function updateTelemetryUI() {
+            const Rp = (state.m * state.Z) / 2.0;
+            const pitch = Math.PI * state.m;
+            const De = 2.0 * (Rp + state.m);
+            const omegaRadS = (state.rpm * 2.0 * Math.PI) / 60.0;
+            const linearVel = state.paused ? 0.0 : omegaRadS * Rp;
+            const currentX = Rp * state.phi;
+            const currentDeg = ((state.phi * 180.0) / Math.PI) % 360.0;
+
+            document.getElementById('out-rp').textContent = `${Rp.toFixed(2)} mm`;
+            document.getElementById('out-pitch').textContent = `${pitch.toFixed(2)} mm`;
+            document.getElementById('out-vel').textContent = `${linearVel.toFixed(2)} mm/s`;
+            document.getElementById('out-de').textContent = `${De.toFixed(2)} mm`;
+            document.getElementById('out-x').textContent = `${currentX.toFixed(1)} mm`;
+            document.getElementById('out-phi').textContent = `${currentDeg.toFixed(1)}°`;
+        }
+
+        // ============================================================================
+        // CONTROL DE CÁMARA ORBITAL SUAVE (RATÓN Y TÁCTIL)
+        // ============================================================================
+        const camControl = {
+            target: new THREE.Vector3(0, 14, 0),
+            theta: 0.0,         // Ángulo horizontal (0 = vista frontal pura)
+            phi: Math.PI / 2,   // Ángulo polar (PI/2 = nivel horizontal)
+            radius: 145,
+            isDragging: false,
+            isPanning: false,
+            prevX: 0,
+            prevY: 0
+        };
+
+        function applyCameraTransform() {
+            // Limitar ángulo polar para evitar inversión
+            camControl.phi = Math.max(0.15, Math.min(Math.PI - 0.15, camControl.phi));
+            camControl.radius = Math.max(28, Math.min(420, camControl.radius));
+
+            const x = camControl.target.x + camControl.radius * Math.sin(camControl.phi) * Math.sin(camControl.theta);
+            const y = camControl.target.y + camControl.radius * Math.cos(camControl.phi);
+            const z = camControl.target.z + camControl.radius * Math.sin(camControl.phi) * Math.cos(camControl.theta);
+
+            camera.position.set(x, y, z);
+            camera.lookAt(camControl.target);
+        }
+
+        // Eventos de ratón para rotar, hacer zoom y desplazar
+        container.addEventListener('mousedown', (e) => {
+            camControl.isDragging = true;
+            camControl.isPanning = (e.button === 2 || e.shiftKey);
+            camControl.prevX = e.clientX;
+            camControl.prevY = e.clientY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!camControl.isDragging) return;
+            const dx = e.clientX - camControl.prevX;
+            const dy = e.clientY - camControl.prevY;
+            camControl.prevX = e.clientX;
+            camControl.prevY = e.clientY;
+
+            if (camControl.isPanning) {
+                const panFactor = camControl.radius * 0.0015;
+                camControl.target.x -= dx * panFactor;
+                camControl.target.y += dy * panFactor;
+            } else {
+                camControl.theta -= dx * 0.007;
+                camControl.phi -= dy * 0.007;
+            }
+            applyCameraTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            camControl.isDragging = false;
+        });
+
+        container.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camControl.radius += e.deltaY * 0.09;
+            applyCameraTransform();
+        }, { passive: false });
+
+        // Soporte táctil para móviles y tablets
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                camControl.isDragging = true;
+                camControl.isPanning = false;
+                camControl.prevX = e.touches[0].clientX;
+                camControl.prevY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!camControl.isDragging || e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - camControl.prevX;
+            const dy = e.touches[0].clientY - camControl.prevY;
+            camControl.prevX = e.touches[0].clientX;
+            camControl.prevY = e.touches[0].clientY;
+            camControl.theta -= dx * 0.007;
+            camControl.phi -= dy * 0.007;
+            applyCameraTransform();
+        }, { passive: true });
+
+        container.addEventListener('touchend', () => {
+            camControl.isDragging = false;
+        });
+
+        // ============================================================================
+        // CONEXIÓN DE INTERFAZ Y EVENTOS DE USUARIO
+        // ============================================================================
+        const sliderZ = document.getElementById('slider-z');
+        const sliderM = document.getElementById('slider-m');
+        const sliderRpm = document.getElementById('slider-rpm');
+        const chkPitch = document.getElementById('chk-pitch');
+        const chkAutobounce = document.getElementById('chk-autobounce');
+
+        sliderZ.addEventListener('input', (e) => {
+            state.Z = parseInt(e.target.value, 10);
+            document.getElementById('val-z').textContent = state.Z;
+            rebuildMechanismGeometry();
+        });
+
+        sliderM.addEventListener('input', (e) => {
+            state.m = parseFloat(e.target.value);
+            document.getElementById('val-m').textContent = `${state.m.toFixed(1)} mm`;
+            rebuildMechanismGeometry();
+        });
+
+        sliderRpm.addEventListener('input', (e) => {
+            state.rpm = parseFloat(e.target.value);
+            document.getElementById('val-rpm').textContent = `${state.rpm} RPM`;
+            updateTelemetryUI();
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            state.paused = !state.paused;
+            document.getElementById('pause-icon').textContent = state.paused ? '▶' : '⏸';
+            document.getElementById('pause-text').textContent = state.paused ? 'Reanudar' : 'Pausar';
+            const badge = document.getElementById('status-badge');
+            if (state.paused) {
+                badge.textContent = 'En Pausa';
+                badge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            } else {
+                badge.textContent = 'Engrane Sincronizado';
+                badge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            }
+            updateTelemetryUI();
+        });
+
+        document.getElementById('btn-reverse').addEventListener('click', () => {
+            state.rpm = -state.rpm;
+            sliderRpm.value = state.rpm;
+            document.getElementById('val-rpm').textContent = `${state.rpm} RPM`;
+            updateTelemetryUI();
+        });
+
+        document.getElementById('btn-reset-phase').addEventListener('click', () => {
+            state.phi = 0.0;
+            updateKinematicsTransform();
+            updateTelemetryUI();
+        });
+
+        chkPitch.addEventListener('change', (e) => {
+            state.showPitchRef = e.target.checked;
+            const refObj = overlayGroup.getObjectByName('pitchReferences');
+            if (refObj) refObj.visible = state.showPitchRef;
+        });
+
+        chkAutobounce.addEventListener('change', (e) => {
+            state.autoBounce = e.target.checked;
+        });
+
+        // Vistas rápidas de cámara
+        const btnViewFront = document.getElementById('btn-view-front');
+        const btnView3D = document.getElementById('btn-view-3d');
+        const btnViewZoom = document.getElementById('btn-view-zoom');
+
+        function highlightCameraBtn(activeBtn) {
+            [btnViewFront, btnView3D, btnViewZoom].forEach(btn => {
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800 transition';
+            });
+            activeBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 transition';
+        }
+
+        btnViewFront.addEventListener('click', () => {
+            const Rp = (state.m * state.Z) / 2.0;
+            camControl.target.set(0, Rp * 0.45, 0);
+            camControl.theta = 0.0;
+            camControl.phi = Math.PI / 2.0;
+            camControl.radius = Math.max(115, Rp * 3.8);
+            applyCameraTransform();
+            highlightCameraBtn(btnViewFront);
+        });
+
+        btnView3D.addEventListener('click', () => {
+            const Rp = (state.m * state.Z) / 2.0;
+            camControl.target.set(0, Rp * 0.45, 0);
+            camControl.theta = 0.48;
+            camControl.phi = 1.22;
+            camControl.radius = Math.max(130, Rp * 4.1);
+            applyCameraTransform();
+            highlightCameraBtn(btnView3D);
+        });
+
+        btnViewZoom.addEventListener('click', () => {
+            camControl.target.set(0, 0, 0);
+            camControl.theta = 0.0;
+            camControl.phi = Math.PI / 2.0;
+            camControl.radius = state.m * 14.5;
+            applyCameraTransform();
+            highlightCameraBtn(btnViewZoom);
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ============================================================================
+        // BUCLE DE ANIMACIÓN PRINCIPAL
+        // ============================================================================
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000.0, 0.1);
+            lastTime = now;
+
+            if (!state.paused && state.rpm !== 0) {
+                const omega = (state.rpm * 2.0 * Math.PI) / 60.0; // rad/s
+                state.phi += omega * dt;
+
+                const Rp = (state.m * state.Z) / 2.0;
+                const pitch = Math.PI * state.m;
+                const maxDisplacement = state.rackLimitTeeth * pitch;
+                const currentX = Rp * state.phi;
+
+                if (state.autoBounce) {
+                    // Invertir suavemente el sentido de giro al llegar al límite de la cremallera
+                    if (currentX > maxDisplacement && state.rpm > 0) {
+                        state.phi = maxDisplacement / Rp;
+                        state.rpm = -state.rpm;
+                        sliderRpm.value = state.rpm;
+                        document.getElementById('val-rpm').textContent = `${state.rpm} RPM`;
+                    } else if (currentX < -maxDisplacement && state.rpm < 0) {
+                        state.phi = -maxDisplacement / Rp;
+                        state.rpm = -state.rpm;
+                        sliderRpm.value = state.rpm;
+                        document.getElementById('val-rpm').textContent = `${state.rpm} RPM`;
+                    }
+                } else {
+                    // Salto periódico de un paso angular completo (2*PI / Z) para mantener la cremallera centrada
+                    const deltaTheta = (2.0 * Math.PI) / state.Z;
+                    if (Math.abs(currentX) > maxDisplacement) {
+                        state.phi = state.phi % deltaTheta;
+                    }
+                }
+
+                updateKinematicsTransform();
+                updateTelemetryUI();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Inicialización al cargar la ventana
+        window.onload = function () {
+            rebuildMechanismGeometry();
+            applyCameraTransform();
+            lastTime = performance.now();
+            animate(lastTime);
+        };
+    </script>
+</body>
+</html>

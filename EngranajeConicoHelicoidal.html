@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador 3D: Engranajes Cónicos Helicoidales (Espirales)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #e2e8f0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 999px;
+            border: 1px solid #334155;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #7dd3fc;
+        }
+        /* Etiquetas flotantes 3D */
+        .vector-label {
+            position: absolute;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.85);
+            transition: opacity 0.15s;
+            z-index: 10;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col lg:flex-row overflow-hidden">
+
+    <!-- Lienzo 3D Principal -->
+    <div id="canvas-container" class="relative flex-1 h-[52vh] lg:h-full w-full bg-gradient-to-br from-[#131b2e] via-[#0b101b] to-[#060911] overflow-hidden">
+        
+        <!-- Cabecera Flotante -->
+        <div class="absolute top-3 left-3 right-3 flex flex-wrap justify-between items-start pointer-events-none z-20 gap-2">
+            <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2.5 shadow-2xl pointer-events-auto">
+                <div class="flex items-center gap-2.5">
+                    <span class="h-3 w-3 rounded-full bg-amber-400 animate-pulse"></span>
+                    <h1 class="text-sm sm:text-base font-bold tracking-tight text-white">Dinámica de Engranajes Cónicos Helicoidales (Σ = 90°)</h1>
+                </div>
+                <p id="header-subtitle" class="text-xs text-slate-300 mt-0.5 mono">
+                    Z₁ = 20 | Z₂ = 28 | i = 1.40 | δ₁ = 35.5° | δ₂ = 54.5°
+                </p>
+            </div>
+
+            <!-- Botones rápidos de cámara y tema de color -->
+            <div class="flex flex-wrap gap-1.5 pointer-events-auto">
+                <button id="btn-view-iso" class="bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 text-xs font-medium px-3 py-2 rounded-lg backdrop-blur-md transition shadow-lg">
+                    Vista Perspectiva
+                </button>
+                <button id="btn-view-mesh" class="bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700 text-xs font-medium px-3 py-2 rounded-lg backdrop-blur-md transition shadow-lg">
+                    Zoom Zona Engrane
+                </button>
+                <button id="btn-theme" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 text-xs font-semibold px-3 py-2 rounded-lg backdrop-blur-md transition shadow-lg">
+                    Color: Bronce / Acero Plata
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor de Etiquetas 3D para los vectores -->
+        <div id="labels-container" class="absolute inset-0 pointer-events-none overflow-hidden">
+            <div id="label-ft" class="vector-label bg-sky-950/95 text-sky-300 border border-sky-400">Ft</div>
+            <div id="label-fr" class="vector-label bg-emerald-950/95 text-emerald-300 border border-emerald-400">Fr</div>
+            <div id="label-fa" class="vector-label bg-rose-950/95 text-rose-300 border border-rose-400">Fa</div>
+            <div id="label-fn" class="vector-label bg-amber-950/95 text-amber-300 border border-amber-400">Fn</div>
+        </div>
+
+        <!-- Leyenda inferior en el visor -->
+        <div class="absolute bottom-3 left-3 right-3 flex flex-wrap justify-between items-center pointer-events-none z-20 text-xs text-slate-300 gap-2">
+            <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-lg">
+                🖱️ <b>Arrastrar:</b> Rotar 3D &nbsp;|&nbsp; <b>Rueda:</b> Zoom &nbsp;|&nbsp; <b>Click derecho:</b> Desplazar
+            </div>
+            <div id="status-badge" class="bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 px-3 py-1.5 rounded-lg font-medium backdrop-blur-md">
+                ✓ Empuje Axial Positivo (+Fa): Tiende a separar los conos
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Lateral de Control y Telemetría -->
+    <aside class="w-full lg:w-[440px] xl:w-[460px] h-[48vh] lg:h-full bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col z-30">
+        
+        <div class="p-4 overflow-y-auto custom-scroll flex-1 space-y-4">
+
+            <!-- Sección 1: Número de Dientes y Geometría de Conos -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-400">1. Dientes y Relación de Conos</h2>
+                    <span id="val-ratio-badge" class="text-[11px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded mono font-semibold">
+                        i = 1.40
+                    </span>
+                </div>
+
+                <!-- Sliders Z1 y Z2 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-lg p-2.5">
+                        <div class="flex justify-between text-xs mb-1">
+                            <label for="slider-z1" class="font-medium text-amber-300">Piñón Motriz ($Z_1$)</label>
+                            <span id="val-z1" class="mono font-bold text-white">20 dientes</span>
+                        </div>
+                        <input id="slider-z1" type="range" min="12" max="40" step="1" value="20">
+                        <div class="flex justify-between text-[10px] text-slate-400 mt-1 mono">
+                            <span>Cono δ₁: <b id="val-delta1" class="text-amber-300">35.5°</b></span>
+                            <span>Eje X</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-lg p-2.5">
+                        <div class="flex justify-between text-xs mb-1">
+                            <label for="slider-z2" class="font-medium text-sky-300">Corona Conducida ($Z_2$)</label>
+                            <span id="val-z2" class="mono font-bold text-white">28 dientes</span>
+                        </div>
+                        <input id="slider-z2" type="range" min="12" max="48" step="1" value="28">
+                        <div class="flex justify-between text-[10px] text-slate-400 mt-1 mono">
+                            <span>Cono δ₂: <b id="val-delta2" class="text-sky-300">54.5°</b></span>
+                            <span>Eje Y</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slider Ángulo de Espiral Beta -->
+                <div class="pt-1">
+                    <div class="flex justify-between text-xs mb-1">
+                        <label for="slider-beta" class="font-medium text-slate-200">Ángulo de Espiral ($\beta$)</label>
+                        <span id="val-beta" class="mono font-bold text-sky-400">32° (Helicoidal)</span>
+                    </div>
+                    <input id="slider-beta" type="range" min="0" max="42" step="1" value="32">
+                    <div class="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                        <span>0° (Cónico Recto)</span>
+                        <span>20° (Suave)</span>
+                        <span>35° (Gleason)</span>
+                        <span>42°</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección 2: Cinemática y Par de Entrada -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400">2. Par Motor y Cinemática</h2>
+                    <span class="text-[11px] text-slate-400 mono">αₙ = 20° | mₘ = 3.5 mm</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Slider Par Motor -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label for="slider-torque" class="font-medium text-slate-200">Par Piñón ($T_1$)</label>
+                            <span id="val-torque" class="mono font-bold text-sky-400">150 Nm</span>
+                        </div>
+                        <input id="slider-torque" type="range" min="30" max="400" step="10" value="150">
+                    </div>
+
+                    <!-- Slider Velocidad RPM -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label for="slider-rpm" class="font-medium text-slate-200">Velocidad ($n_1$)</label>
+                            <span id="val-rpm" class="mono font-bold text-sky-400">20 RPM</span>
+                        </div>
+                        <input id="slider-rpm" type="range" min="0" max="60" step="1" value="20">
+                    </div>
+                </div>
+
+                <!-- Botones de Sentido de Giro y Mano de Espiral -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button id="btn-reverse" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 rounded-lg py-2 px-2.5 text-xs font-medium transition">
+                        <span>🔄</span> <span id="txt-dir">Giro Piñón: Horario (CW)</span>
+                    </button>
+                    <button id="btn-hand" class="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 rounded-lg py-2 px-2.5 text-xs font-medium transition">
+                        <span>🌀</span> <span id="txt-hand">Piñón: Hélice Izq. (LH)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección 3: Telemetría de Fuerzas en el Punto Medio -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-400">3. Fuerzas sobre el Piñón Motriz</h2>
+                    <span id="val-rm" class="text-[11px] text-slate-400 mono">rₘ₁ = 35.0 mm</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <!-- Ft -->
+                    <div class="bg-slate-900 border border-sky-500/40 rounded-lg p-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] text-slate-300">Tangencial ($F_t$)</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                        </div>
+                        <div id="read-ft" class="mono text-base font-bold text-sky-300 mt-0.5">4286 N</div>
+                        <div class="text-[10px] text-slate-400">Genera el par de giro</div>
+                    </div>
+
+                    <!-- Fr -->
+                    <div class="bg-slate-900 border border-emerald-500/40 rounded-lg p-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] text-slate-300">Radial Piñón ($F_{r1}$)</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <div id="read-fr" class="mono text-base font-bold text-emerald-300 mt-0.5">-62 N</div>
+                        <div class="text-[10px] text-slate-400">Flexión sobre Eje 1 (= Fa₂)</div>
+                    </div>
+
+                    <!-- Fa -->
+                    <div class="bg-slate-900 border border-rose-500/40 rounded-lg p-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] text-slate-300">Axial Piñón ($F_{a1}$)</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+                        </div>
+                        <div id="read-fa" class="mono text-base font-bold text-rose-300 mt-0.5">+3245 N</div>
+                        <div id="desc-fa" class="text-[10px] text-slate-400">Empuje sobre Eje 1 (= Fr₂)</div>
+                    </div>
+
+                    <!-- Fn -->
+                    <div class="bg-slate-900 border border-amber-500/40 rounded-lg p-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] text-slate-300">Normal Total ($F_n$)</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                        </div>
+                        <div id="read-fn" class="mono text-base font-bold text-amber-300 mt-0.5">5376 N</div>
+                        <div class="text-[10px] text-slate-400">Carga perpendicular diente</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección 4: Visibilidad de Capas -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">4. Elementos de Escena</h2>
+                
+                <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
+                    <span>Mostrar Vectores de Fuerza ($F_t, F_r, F_a, F_n$)</span>
+                    <input id="chk-vectors" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+                </label>
+
+                <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
+                    <span>Mostrar Ejes, Chavetas y Soportes de Rodamiento</span>
+                    <input id="chk-shafts" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+                </label>
+
+                <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
+                    <span>Mostrar Líneas de Ejes y Vértice Común (0,0,0)</span>
+                    <input id="chk-cones" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+                </label>
+
+                <label class="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
+                    <span>Pausar Rotación</span>
+                    <input id="chk-pause" type="checkbox" class="w-4 h-4 accent-sky-500 rounded cursor-pointer">
+                </label>
+            </div>
+
+        </div>
+    </aside>
+
+    <script>
+        // ============================================================================
+        // ESTADO GLOBAL DEL SISTEMA DE ENGRANAJES CÓNICOS HELICOIDALES (Σ = 90°)
+        // ============================================================================
+        const state = {
+            Z1: 20,                         // Dientes del piñón motriz (Eje X)
+            Z2: 28,                         // Dientes de la corona conducida (Eje Y)
+            delta1: Math.atan2(20, 28),     // Semiángulo de cono piñón (rad)
+            delta2: Math.atan2(28, 20),     // Semiángulo de cono corona (rad)
+            alpha_n: 20 * Math.PI / 180,    // Ángulo de presión normal (20°)
+            betaDeg: 32,                    // Ángulo de espiral (grados)
+            torque: 150,                    // Par motor de entrada en el piñón (Nm)
+            rpm: 20,                        // Velocidad del piñón (RPM)
+            dirCW: 1,                       // 1 = Horario (CW), -1 = Antihorario (CCW)
+            pinionHand: -1,                 // -1 = Hélice Izquierda (LH), +1 = Hélice Derecha (RH)
+            showVectors: true,
+            showShafts: true,
+            showCones: true,
+            paused: false,
+            themeIndex: 0                   // 0 = Bronce/Plata, 1 = Azul Cobalto/Titanio, 2 = Cromo/Oro
+        };
+
+        // Paletas metálicas 100% opacas de alto contraste sobre el fondo oscuro
+        const COLOR_THEMES = [
+            {
+                name: "Color: Bronce / Acero Plata",
+                pinionColor: 0xf59e0b,      // Bronce-oro mecanizado brillante
+                gearColor:   0xe2e8f0,      // Acero al cromo-plata muy claro
+                shaftColor:  0x94a3b8
+            },
+            {
+                name: "Color: Azul Anodizado / Titanio",
+                pinionColor: 0x38bdf8,      // Azul cobalto claro brillante
+                gearColor:   0xf1f5f9,      // Blanco titanio mecanizado
+                shaftColor:  0xcbd5e1
+            },
+            {
+                name: "Color: Cobre Rojo / Latón Claro",
+                pinionColor: 0xf97316,      // Cobre mecanizado intenso
+                gearColor:   0xfde047,      // Latón dorado brillante
+                shaftColor:  0x94a3b8
+            }
+        ];
+
+        // Variables de escena Three.js
+        let scene, camera, renderer;
+        let pinionGroup, gearGroup;         // Grupos rotatorios para Piñón (Eje X) y Corona (Eje Y)
+        let bearingsStaticGroup;            // Soportes de cojinetes estáticos y líneas al vértice
+        let vectorsGroup;
+        let arrowFt, arrowFr, arrowFa, arrowFn;
+
+        // Materiales 100% opacos (transparent: false, depthWrite: true)
+        let pinionMat, gearMat, shaftMat, keyMat, bearingHousingMat, darkGrooveMat;
+
+        // Geometría derivada actual
+        let geomParams = {
+            Rm: 4.2,        // Distancia generatriz media al vértice (unidades 3D)
+            Rinner: 3.1,    // Distancia generatriz interna
+            Router: 5.3,    // Distancia generatriz externa
+            module3D: 0.25, // Módulo normal en el punto medio (unidades 3D)
+            rMean1_m: 0.035 // Radio medio físico del piñón en metros para cálculo de fuerzas
+        };
+
+        // Control de cámara orbital
+        const camCtrl = {
+            theta: 0.42,
+            phi: 1.32,
+            radius: 15.0,
+            target: new THREE.Vector3(-2.4, -2.4, 0.0),
+            isDragging: false,
+            isPanning: false,
+            prevX: 0,
+            prevY: 0
+        };
+
+        // ============================================================================
+        // CÁLCULO DE PARÁMETROS GEOMÉTRICOS DE LOS CONOS (Σ = 90°)
+        // ============================================================================
+        function computeConesGeometry() {
+            state.delta1 = Math.atan2(state.Z1, state.Z2);
+            state.delta2 = Math.atan2(state.Z2, state.Z1); // Complementario: delta1 + delta2 = 90°
+
+            // Elegimos un módulo 3D adaptativo para que el conjunto siempre tenga un tamaño óptimo en pantalla
+            const hypotZ = Math.sqrt(state.Z1 * state.Z1 + state.Z2 * state.Z2);
+            geomParams.Rm = 4.35; // Distancia generatriz media fija desde el vértice (0,0,0)
+            geomParams.module3D = (2 * geomParams.Rm) / hypotZ;
+
+            const faceWidth = Math.min(2.25, geomParams.Rm * 0.52);
+            geomParams.Rinner = geomParams.Rm - faceWidth * 0.5;
+            geomParams.Router = geomParams.Rm + faceWidth * 0.5;
+
+            // Radio medio físico del piñón en metros (asumiendo módulo medio real m_m = 3.5 mm)
+            const realModuleMeters = 0.0035;
+            geomParams.rMean1_m = 0.5 * realModuleMeters * state.Z1;
+        }
+
+        // ============================================================================
+        // CONSTRUCCIÓN DE CUERPO SÓLIDO 100% OPACO + EJE MECÁNICO + CHAVETA
+        // ============================================================================
+        /**
+         * Crea el cuerpo macizo del engranaje cónico (tronco de cono + caras planas + cubo posterior + eje)
+         * completamente cerrado y opaco alrededor del eje Y local (donde el vértice es Y = 0, y el cono está en +Y).
+         */
+        function createSolidBevelBlankAndShaft(delta, bodyMaterial) {
+            const group = new THREE.Group();
+
+            const sinD = Math.sin(delta);
+            const cosD = Math.cos(delta);
+
+            const R_in  = geomParams.Rinner;
+            const R_out = geomParams.Router;
+            const Rm    = geomParams.Rm;
+
+            // Altura de raíz del diente (dedendum) para que los dientes asienten sobre material sólido
+            const hDedMean = 1.18 * geomParams.module3D;
+            const hDedIn   = hDedMean * (R_in / Rm);
+            const hDedOut  = hDedMean * (R_out / Rm);
+
+            // Coordenadas en la raíz del cono (desplazadas perpendicularmente hacia adentro de la generatriz)
+            const rFrontRoot = Math.max(0.35, R_in * sinD - hDedIn * cosD);
+            const yFrontRoot = R_in * cosD + hDedIn * sinD;
+
+            const rBackRoot  = Math.max(0.55, R_out * sinD - hDedOut * cosD);
+            const yBackRoot  = R_out * cosD + hDedOut * sinD;
+
+            // Dimensiones del cubo posterior (hub) y del eje (shaft)
+            const rShaft = Math.max(0.32, Math.min(0.85, rFrontRoot * 0.52));
+            const rHub   = Math.max(rShaft + 0.22, Math.min(rBackRoot * 0.82, rBackRoot - 0.15));
+            const hubLen = 1.45;
+            const yBackFace = yBackRoot + 0.25;
+            const yHubEnd   = yBackFace + hubLen;
+
+            // Perfil cerrado de revolución (desde el centro r=0 en la cara frontal hasta r=0 en el fin del cubo)
+            // Esto garantiza que NUNCA se vea transparente ni hueco desde ningún ángulo.
+            const lathePoints = [
+                new THREE.Vector2(0.0, yFrontRoot),
+                new THREE.Vector2(rFrontRoot, yFrontRoot),
+                new THREE.Vector2(rBackRoot, yBackRoot),
+                new THREE.Vector2(rBackRoot, yBackFace),
+                new THREE.Vector2(rHub, yBackFace),
+                new THREE.Vector2(rHub, yHubEnd),
+                new THREE.Vector2(0.0, yHubEnd)
+            ];
+
+            const blankGeo = new THREE.LatheGeometry(lathePoints, 72);
+            blankGeo.computeVertexNormals();
+            const blankMesh = new THREE.Mesh(blankGeo, bodyMaterial);
+            group.add(blankMesh);
+
+            // Rebaje anular decorativo de alto contraste en la cara frontal y trasera
+            const ringRadius = Math.max(rShaft + 0.06, rFrontRoot * 0.72);
+            const frontCapGeo = new THREE.CylinderGeometry(ringRadius, ringRadius, 0.06, 48);
+            const frontCapMesh = new THREE.Mesh(frontCapGeo, darkGrooveMat);
+            frontCapMesh.position.y = yFrontRoot - 0.01;
+            group.add(frontCapMesh);
+
+            // Subgrupo del Eje Mecánico Físico (Shaft) que atraviesa el engranaje
+            const shaftSubgroup = new THREE.Group();
+            shaftSubgroup.name = "shaftPart";
+
+            const shaftStart = yFrontRoot - 0.35; // Sobresale ligeramente por delante del cono menor
+            const shaftEnd   = yHubEnd + 3.4;     // Se extiende hacia atrás a través del rodamiento
+            const shaftLen   = shaftEnd - shaftStart;
+
+            const shaftGeo = new THREE.CylinderGeometry(rShaft, rShaft, shaftLen, 48);
+            const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+            shaftMesh.position.y = 0.5 * (shaftStart + shaftEnd);
+            shaftSubgroup.add(shaftMesh);
+
+            // Chaveta longitudinal (Keyway) sobre el eje para apreciar claramente el giro del eje
+            const keyGeo = new THREE.BoxGeometry(rShaft * 0.35, shaftLen * 0.88, rShaft * 0.35);
+            const keyMesh = new THREE.Mesh(keyGeo, keyMat);
+            keyMesh.position.set(rShaft * 0.92, 0.5 * (shaftStart + shaftEnd), 0);
+            shaftSubgroup.add(keyMesh);
+
+            // Anillo de retención / collarín junto al cubo
+            const collarGeo = new THREE.CylinderGeometry(rShaft * 1.28, rShaft * 1.28, 0.25, 36);
+            const collarMesh = new THREE.Mesh(collarGeo, keyMat);
+            collarMesh.position.y = yHubEnd + 0.14;
+            shaftSubgroup.add(collarMesh);
+
+            shaftSubgroup.visible = state.showShafts;
+            group.add(shaftSubgroup);
+
+            // Guardamos la posición del soporte de rodamiento para los elementos estáticos
+            group.userData = {
+                rShaft: rShaft,
+                yBearingPos: yHubEnd + 1.85
+            };
+
+            return group;
+        }
+
+        /**
+         * Construye la malla 3D cerrada y 100% sólida de los Z dientes cónicos helicoidales (espirales)
+         * sobre el cono de semiángulo `delta`.
+         */
+        function createSpiralBevelTeethGeometry(numTeeth, delta, betaRad, handSign, phaseOffset) {
+            const segS = 22; // Divisiones a lo largo del diente
+            const positions = [];
+            const indices = [];
+
+            const sinD = Math.sin(delta);
+            const cosD = Math.cos(delta);
+            const pitchAngle = (2 * Math.PI) / numTeeth;
+
+            const R_in  = geomParams.Rinner;
+            const R_out = geomParams.Router;
+            const Rm    = geomParams.Rm;
+
+            // Alturas de cabeza (addendum) y raíz (dedendum) proporcionales al módulo 3D
+            const hAddMean = 0.95 * geomParams.module3D;
+            const hDedMean = 1.22 * geomParams.module3D; // Se solapa ligeramente dentro del cono base
+
+            for (let t = 0; t < numTeeth; t++) {
+                const baseAngle = t * pitchAngle + phaseOffset;
+                const toothStartVertex = positions.length / 3;
+
+                for (let i = 0; i <= segS; i++) {
+                    const u = i / segS;
+                    const R = R_in + u * (R_out - R_in);
+                    const scale = R / Rm;
+
+                    // Radio y posición axial sobre la generatriz primitiva
+                    const rPitch = R * sinD;
+                    const yPitch = R * cosD;
+
+                    // Ángulo de espiral logarítmica sobre la superficie cónica
+                    const spiralTheta = handSign * Math.tan(betaRad) * Math.log(R / Rm) / sinD;
+                    const thetaCenter = baseAngle + spiralTheta;
+
+                    const hAdd = hAddMean * scale;
+                    const hDed = hDedMean * scale;
+
+                    // Semianchos angulares del diente evolvente (6 vértices por sección transversal)
+                    const wRoot  = pitchAngle * 0.35;
+                    const wPitch = pitchAngle * 0.245;
+                    const wTip   = pitchAngle * 0.135;
+
+                    const profileSpecs = [
+                        { dTheta: -wRoot,  h: -hDed }, // 0: Raíz izquierda
+                        { dTheta: -wPitch, h:  0.0  }, // 1: Flanco primitivo izquierdo
+                        { dTheta: -wTip,   h:  hAdd }, // 2: Cresta izquierda
+                        { dTheta:  wTip,   h:  hAdd }, // 3: Cresta derecha
+                        { dTheta:  wPitch, h:  0.0  }, // 4: Flanco primitivo derecho
+                        { dTheta:  wRoot,  h: -hDed }  // 5: Raíz derecha
+                    ];
+
+                    for (let p = 0; p < 6; p++) {
+                        const spec = profileSpecs[p];
+                        // Vector normal exterior al cono: (+cosD en radio, -sinD en eje Y)
+                        const r = Math.max(0.05, rPitch + spec.h * cosD);
+                        const y = yPitch - spec.h * sinD;
+                        const ang = thetaCenter + spec.dTheta;
+
+                        const vx = r * Math.cos(ang);
+                        const vz = r * Math.sin(ang);
+                        positions.push(vx, y, vz);
+                    }
+                }
+
+                // Caras laterales y cresta a lo largo de los segmentos del diente
+                for (let i = 0; i < segS; i++) {
+                    const rowA = toothStartVertex + i * 6;
+                    const rowB = toothStartVertex + (i + 1) * 6;
+
+                    for (let p = 0; p < 5; p++) {
+                        const a = rowA + p;
+                        const b = rowB + p;
+                        const c = rowB + (p + 1);
+                        const d = rowA + (p + 1);
+
+                        indices.push(a, b, c);
+                        indices.push(a, c, d);
+                    }
+                    // Cerrar también la base del diente (entre p=5 y p=0) para un volumen 100% estanco
+                    indices.push(rowA + 5, rowB + 5, rowB + 0);
+                    indices.push(rowA + 5, rowB + 0, rowA + 0);
+                }
+
+                // Tapa frontal sólida (en i = 0, punta menor del diente)
+                const f = toothStartVertex;
+                indices.push(f + 0, f + 4, f + 1);
+                indices.push(f + 0, f + 5, f + 4);
+                indices.push(f + 1, f + 3, f + 2);
+                indices.push(f + 1, f + 4, f + 3);
+
+                // Tapa trasera sólida (en i = segS, talón exterior del diente)
+                const b = toothStartVertex + segS * 6;
+                indices.push(b + 0, b + 1, b + 4);
+                indices.push(b + 0, b + 4, b + 5);
+                indices.push(b + 1, b + 2, b + 3);
+                indices.push(b + 1, b + 3, b + 4);
+            }
+
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geo.setIndex(indices);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        // ============================================================================
+        // INICIALIZACIÓN DE THREE.JS Y MATERIALES OPACOS DE ALTO CONTRASTE
+        // ============================================================================
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(36, container.clientWidth / container.clientHeight, 0.1, 120);
+            updateCameraTransform();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.35;
+            container.appendChild(renderer.domElement);
+
+            // Iluminación multidireccional intensa para que ningún flanco quede negro ni parezca transparente
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 1.15);
+            scene.add(hemiLight);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+            keyLight.position.set(10, 14, 16);
+            scene.add(keyLight);
+
+            const fillLightLeft = new THREE.DirectionalLight(0xe0f2fe, 1.35);
+            fillLightLeft.position.set(-16, 8, 12);
+            scene.add(fillLightLeft);
+
+            const bottomRimLight = new THREE.DirectionalLight(0xfef08a, 1.15);
+            bottomRimLight.position.set(6, -16, 10);
+            scene.add(bottomRimLight);
+
+            const backLight = new THREE.DirectionalLight(0xcbd5e1, 1.0);
+            backLight.position.set(-10, -10, -14);
+            scene.add(backLight);
+
+            // Definición de Materiales 100% OPACOS (`transparent: false`, `opacity: 1.0`, `depthWrite: true`)
+            const theme = COLOR_THEMES[state.themeIndex];
+
+            pinionMat = new THREE.MeshStandardMaterial({
+                color: theme.pinionColor,
+                metalness: 0.45,
+                roughness: 0.28,
+                transparent: false,
+                opacity: 1.0,
+                depthWrite: true,
+                side: THREE.DoubleSide
+            });
+
+            gearMat = new THREE.MeshStandardMaterial({
+                color: theme.gearColor,
+                metalness: 0.42,
+                roughness: 0.28,
+                transparent: false,
+                opacity: 1.0,
+                depthWrite: true,
+                side: THREE.DoubleSide
+            });
+
+            shaftMat = new THREE.MeshStandardMaterial({
+                color: theme.shaftColor,
+                metalness: 0.55,
+                roughness: 0.25,
+                transparent: false,
+                opacity: 1.0,
+                depthWrite: true
+            });
+
+            keyMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                metalness: 0.4,
+                roughness: 0.3,
+                transparent: false
+            });
+
+            bearingHousingMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                metalness: 0.5,
+                roughness: 0.4,
+                transparent: false
+            });
+
+            darkGrooveMat = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                metalness: 0.3,
+                roughness: 0.6,
+                transparent: false
+            });
+
+            // Grupos principales
+            pinionGroup = new THREE.Group();
+            gearGroup = new THREE.Group();
+            bearingsStaticGroup = new THREE.Group();
+            scene.add(pinionGroup, gearGroup, bearingsStaticGroup);
+
+            // Vectores 3D de fuerza
+            buildForceVectors();
+
+            // Construcción inicial completa de ambos engranajes y sus ejes
+            rebuildCompleteGearAssembly();
+
+            setupInteraction(renderer.domElement);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        /**
+         * Reconstruye por completo los dos engranajes cónicos, sus dientes en espiral, sus ejes y cojinetes
+         * cada vez que cambian Z1, Z2, Beta o la mano de la hélice.
+         */
+        function rebuildCompleteGearAssembly() {
+            computeConesGeometry();
+
+            // Limpiar geometrías previas de Piñón y Corona
+            clearGroupGeometries(pinionGroup);
+            clearGroupGeometries(gearGroup);
+            clearGroupGeometries(bearingsStaticGroup);
+
+            const betaRad = state.betaDeg * Math.PI / 180;
+
+            // 1. Cuerpo sólido y eje del Piñón 1 (Eje X negativo)
+            const blank1 = createSolidBevelBlankAndShaft(state.delta1, pinionMat);
+            pinionGroup.add(blank1);
+
+            // Dientes del Piñón 1
+            // En nuestra orientación: la generatriz de contacto está en theta1 = 0 para el Piñón 1
+            const teethGeo1 = createSpiralBevelTeethGeometry(state.Z1, state.delta1, betaRad, state.pinionHand, 0);
+            const teethMesh1 = new THREE.Mesh(teethGeo1, pinionMat);
+            pinionGroup.add(teethMesh1);
+
+            // 2. Cuerpo sólido y eje de la Corona 2 (Eje Y negativo)
+            const blank2 = createSolidBevelBlankAndShaft(state.delta2, gearMat);
+            gearGroup.add(blank2);
+
+            // Dientes de la Corona 2 (Mano opuesta `-state.pinionHand` y desfase de medio paso en theta2 = PI)
+            const pitchAngle2 = (2 * Math.PI) / state.Z2;
+            const teethGeo2 = createSpiralBevelTeethGeometry(state.Z2, state.delta2, betaRad, -state.pinionHand, Math.PI + pitchAngle2 * 0.5);
+            const teethMesh2 = new THREE.Mesh(teethGeo2, gearMat);
+            gearGroup.add(teethMesh2);
+
+            // 3. Soportes de rodamientos estáticos (cojinetes) y líneas de ejes hacia el vértice (0,0,0)
+            buildStaticBearingsAndAxes(blank1.userData, blank2.userData);
+
+            // 4. Reposicionar el origen de los vectores de fuerza en el punto medio de contacto real
+            const pContact = new THREE.Vector3(
+                -geomParams.Rm * Math.cos(state.delta1),
+                -geomParams.Rm * Math.sin(state.delta1),
+                0
+            );
+            vectorsGroup.position.copy(pContact);
+        }
+
+        function clearGroupGeometries(group) {
+            while (group.children.length > 0) {
+                const child = group.children[0];
+                group.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.children && child.children.length > 0) {
+                    clearGroupGeometries(child);
+                }
+            }
+        }
+
+        /**
+         * Crea los anillos de soporte de rodamientos fijos en el espacio y las líneas de eje que se cortan en (0,0,0)
+         */
+        function buildStaticBearingsAndAxes(info1, info2) {
+            // Cojinete estático Eje 1 (en el semieje -X)
+            const bearingsSub = new THREE.Group();
+            bearingsSub.name = "staticBearings";
+
+            const bOuter1 = info1.rShaft * 1.75;
+            const bGeo1 = new THREE.CylinderGeometry(bOuter1, bOuter1, 0.75, 36);
+            const bMesh1 = new THREE.Mesh(bGeo1, bearingHousingMat);
+            bMesh1.rotation.z = Math.PI / 2;
+            bMesh1.position.set(-info1.yBearingPos, 0, 0);
+            bearingsSub.add(bMesh1);
+
+            // Cojinete estático Eje 2 (en el semieje -Y)
+            const bOuter2 = info2.rShaft * 1.75;
+            const bGeo2 = new THREE.CylinderGeometry(bOuter2, bOuter2, 0.75, 36);
+            const bMesh2 = new THREE.Mesh(bGeo2, bearingHousingMat);
+            bMesh2.position.set(0, -info2.yBearingPos, 0);
+            bearingsSub.add(bMesh2);
+
+            bearingsSub.visible = state.showShafts;
+            bearingsStaticGroup.add(bearingsSub);
+
+            // Líneas de ejes y conos de referencia que convergen en el vértice (0,0,0)
+            const axesSub = new THREE.Group();
+            axesSub.name = "axesLines";
+
+            // Esfera en el vértice común (0,0,0)
+            const apexSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.14, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+            );
+            axesSub.add(apexSphere);
+
+            // Línea Eje 1 (-X hasta 0,0,0) y Eje 2 (-Y hasta 0,0,0) + Generatriz de contacto
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xfacc15 });
+            const ptsAxes = [
+                new THREE.Vector3(-8.5, 0, 0),
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, -8.5, 0)
+            ];
+            axesSub.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsAxes), lineMat));
+
+            // Línea generatriz de contacto primitivo desde (0,0,0) pasando por el punto de engrane
+            const genMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
+            const ptsGen = [
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(
+                    -geomParams.Router * 1.15 * Math.cos(state.delta1),
+                    -geomParams.Router * 1.15 * Math.sin(state.delta1),
+                    0
+                )
+            ];
+            axesSub.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsGen), genMat));
+
+            axesSub.visible = state.showCones;
+            bearingsStaticGroup.add(axesSub);
+        }
+
+        /**
+         * Crea las 4 flechas vectoriales 3D en el punto medio de contacto
+         */
+        function buildForceVectors() {
+            vectorsGroup = new THREE.Group();
+
+            const sphereGeo = new THREE.SphereGeometry(0.13, 20, 20);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            vectorsGroup.add(new THREE.Mesh(sphereGeo, sphereMat));
+
+            arrowFt = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), 1.5, 0x38bdf8, 0.38, 0.24);
+            arrowFr = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1.5, 0x34d399, 0.38, 0.24);
+            arrowFa = new THREE.ArrowHelper(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 0), 1.5, 0xfb7185, 0.38, 0.24);
+            arrowFn = new THREE.ArrowHelper(new THREE.Vector3(-0.5, 0.5, 0.7), new THREE.Vector3(0, 0, 0), 2.0, 0xfbbf24, 0.42, 0.26);
+
+            vectorsGroup.add(arrowFt, arrowFr, arrowFa, arrowFn);
+            scene.add(vectorsGroup);
+        }
+
+        // ============================================================================
+        // CÁLCULO DINÁMICO DE FUERZAS Y TELEMETRÍA EN TIEMPO REAL
+        // ============================================================================
+        function updateDynamicsAndUI() {
+            const beta = state.betaDeg * Math.PI / 180;
+            const alpha = state.alpha_n;
+            const delta1 = state.delta1;
+            const delta2 = state.delta2;
+            const ratio = state.Z2 / state.Z1;
+
+            // Actualizar cabecera y tarjetas de geometría
+            const d1Deg = (delta1 * 180 / Math.PI).toFixed(1);
+            const d2Deg = (delta2 * 180 / Math.PI).toFixed(1);
+
+            document.getElementById('header-subtitle').textContent =
+                `Z₁ = ${state.Z1} | Z₂ = ${state.Z2} | i = ${ratio.toFixed(2)} | δ₁ = ${d1Deg}° | δ₂ = ${d2Deg}°`;
+            document.getElementById('val-ratio-badge').textContent = `i = ${ratio.toFixed(2)}`;
+            document.getElementById('val-delta1').textContent = `${d1Deg}°`;
+            document.getElementById('val-delta2').textContent = `${d2Deg}°`;
+            document.getElementById('val-rm').textContent = `rₘ₁ = ${(geomParams.rMean1_m * 1000).toFixed(1)} mm`;
+
+            // 1. Fuerza Tangencial en el radio medio del piñón: Ft = T1 / r_m1
+            const Ft = state.torque / geomParams.rMean1_m;
+
+            // Signo según combinación Mano de Hélice y Sentido de Giro
+            const factorSign = (-state.pinionHand * state.dirCW) > 0 ? 1 : -1;
+
+            // 2. Fuerza Radial (Fr1) y Fuerza Axial (Fa1) sobre el Piñón 1
+            const Fr = (Ft / Math.cos(beta)) * (Math.tan(alpha) * Math.cos(delta1) - factorSign * Math.sin(beta) * Math.sin(delta1));
+            const Fa = (Ft / Math.cos(beta)) * (Math.tan(alpha) * Math.sin(delta1) + factorSign * Math.sin(beta) * Math.cos(delta1));
+
+            // 3. Fuerza Normal Resultante (Fn)
+            const Fn = Math.sqrt(Ft * Ft + Fr * Fr + Fa * Fa);
+
+            // Actualizar lecturas numéricas
+            document.getElementById('read-ft').textContent = `${Math.round(Ft)} N`;
+            document.getElementById('read-fr').textContent = `${Fr >= 0 ? '+' : ''}${Math.round(Fr)} N`;
+            document.getElementById('read-fa').textContent = `${Fa >= 0 ? '+' : ''}${Math.round(Fa)} N`;
+            document.getElementById('read-fn').textContent = `${Math.round(Fn)} N`;
+
+            // Indicador de seguridad de empuje axial
+            const badge = document.getElementById('status-badge');
+            const descFa = document.getElementById('desc-fa');
+            if (Fa >= 0) {
+                badge.className = "bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 px-3 py-1.5 rounded-lg font-medium backdrop-blur-md";
+                badge.textContent = "✓ Empuje Axial Positivo (+Fa): Tiende a separar los conos (Seguro)";
+                descFa.textContent = "Empuja hacia el cubo (-X)";
+            } else {
+                badge.className = "bg-rose-950/95 border border-rose-500/80 text-rose-300 px-3 py-1.5 rounded-lg font-medium backdrop-blur-md";
+                badge.textContent = "⚠️ Empuje Axial Invertido (-Fa): Succiona el piñón hacia el vértice";
+                descFa.textContent = "Succiona al vértice (+X)";
+            }
+
+            // Escalado de vectores 3D
+            const scaleVec = 1 / 2200;
+
+            const dirFt = new THREE.Vector3(0, 0, state.dirCW > 0 ? 1 : -1);
+            const lenFt = Math.max(0.5, Math.min(3.5, Ft * scaleVec));
+            arrowFt.setDirection(dirFt);
+            arrowFt.setLength(lenFt, 0.34, 0.20);
+
+            const dirFr = new THREE.Vector3(0, Fr >= 0 ? 1 : -1, 0);
+            const lenFr = Math.max(0.4, Math.min(3.2, Math.abs(Fr) * scaleVec));
+            arrowFr.setDirection(dirFr);
+            arrowFr.setLength(lenFr, 0.30, 0.18);
+
+            const dirFa = new THREE.Vector3(Fa >= 0 ? -1 : 1, 0, 0);
+            const lenFa = Math.max(0.4, Math.min(3.2, Math.abs(Fa) * scaleVec));
+            arrowFa.setDirection(dirFa);
+            arrowFa.setLength(lenFa, 0.34, 0.20);
+
+            const vecTotal = new THREE.Vector3(
+                (Fa >= 0 ? -1 : 1) * Math.abs(Fa),
+                Fr,
+                (state.dirCW > 0 ? 1 : -1) * Ft
+            ).normalize();
+            const lenFn = Math.max(0.65, Math.min(3.8, Fn * scaleVec));
+            arrowFn.setDirection(vecTotal);
+            arrowFn.setLength(lenFn, 0.38, 0.24);
+
+            vectorsGroup.userData = {
+                tipFt: dirFt.clone().multiplyScalar(lenFt + 0.28),
+                tipFr: dirFr.clone().multiplyScalar(lenFr + 0.28),
+                tipFa: dirFa.clone().multiplyScalar(lenFa + 0.28),
+                tipFn: vecTotal.clone().multiplyScalar(lenFn + 0.30)
+            };
+        }
+
+        function updateFloatingLabels() {
+            const container = document.getElementById('canvas-container');
+            const labels = ['ft', 'fr', 'fa', 'fn'];
+            const keys = ['tipFt', 'tipFr', 'tipFa', 'tipFn'];
+
+            if (!state.showVectors || !vectorsGroup.userData.tipFt) {
+                labels.forEach(id => document.getElementById(`label-${id}`).style.opacity = '0');
+                return;
+            }
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            const originWorld = vectorsGroup.position;
+
+            labels.forEach((id, idx) => {
+                const el = document.getElementById(`label-${id}`);
+                const worldPos = originWorld.clone().add(vectorsGroup.userData[keys[idx]]);
+                worldPos.project(camera);
+
+                if (worldPos.z > 1) {
+                    el.style.opacity = '0';
+                } else {
+                    const x = (worldPos.x * 0.5 + 0.5) * width;
+                    const y = (-(worldPos.y * 0.5) + 0.5) * height;
+                    el.style.left = `${x}px`;
+                    el.style.top = `${y}px`;
+                    el.style.opacity = '1';
+                }
+            });
+        }
+
+        // ============================================================================
+        // INTERACCIÓN DE CÁMARA Y CONTROLES DE USUARIO
+        // ============================================================================
+        function updateCameraTransform() {
+            const x = camCtrl.target.x + camCtrl.radius * Math.sin(camCtrl.phi) * Math.sin(camCtrl.theta);
+            const y = camCtrl.target.y + camCtrl.radius * Math.cos(camCtrl.phi);
+            const z = camCtrl.target.z + camCtrl.radius * Math.sin(camCtrl.phi) * Math.cos(camCtrl.theta);
+            camera.position.set(x, y, z);
+            camera.lookAt(camCtrl.target);
+        }
+
+        function setupInteraction(domElement) {
+            domElement.addEventListener('mousedown', (e) => {
+                if (e.button === 0) camCtrl.isDragging = true;
+                if (e.button === 2) camCtrl.isPanning = true;
+                camCtrl.prevX = e.clientX;
+                camCtrl.prevY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => {
+                camCtrl.isDragging = false;
+                camCtrl.isPanning = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!camCtrl.isDragging && !camCtrl.isPanning) return;
+                const dx = e.clientX - camCtrl.prevX;
+                const dy = e.clientY - camCtrl.prevY;
+                camCtrl.prevX = e.clientX;
+                camCtrl.prevY = e.clientY;
+
+                if (camCtrl.isDragging) {
+                    camCtrl.theta -= dx * 0.007;
+                    camCtrl.phi = Math.max(0.15, Math.min(Math.PI - 0.15, camCtrl.phi - dy * 0.007));
+                    updateCameraTransform();
+                } else if (camCtrl.isPanning) {
+                    const panFactor = camCtrl.radius * 0.0012;
+                    camCtrl.target.x -= dx * panFactor;
+                    camCtrl.target.y += dy * panFactor;
+                    updateCameraTransform();
+                }
+            });
+
+            domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+            domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camCtrl.radius = Math.max(6.0, Math.min(30, camCtrl.radius + e.deltaY * 0.009));
+                updateCameraTransform();
+            }, { passive: false });
+
+            domElement.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    camCtrl.isDragging = true;
+                    camCtrl.prevX = e.touches[0].clientX;
+                    camCtrl.prevY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            domElement.addEventListener('touchend', () => {
+                camCtrl.isDragging = false;
+            });
+
+            domElement.addEventListener('touchmove', (e) => {
+                if (!camCtrl.isDragging || e.touches.length !== 1) return;
+                const dx = e.touches[0].clientX - camCtrl.prevX;
+                const dy = e.touches[0].clientY - camCtrl.prevY;
+                camCtrl.prevX = e.touches[0].clientX;
+                camCtrl.prevY = e.touches[0].clientY;
+
+                camCtrl.theta -= dx * 0.007;
+                camCtrl.phi = Math.max(0.15, Math.min(Math.PI - 0.15, camCtrl.phi - dy * 0.007));
+                updateCameraTransform();
+            }, { passive: true });
+        }
+
+        function setupUIEvents() {
+            // Slider Dientes Piñón Z1
+            const sliderZ1 = document.getElementById('slider-z1');
+            const valZ1 = document.getElementById('val-z1');
+            sliderZ1.addEventListener('input', (e) => {
+                state.Z1 = parseInt(e.target.value, 10);
+                valZ1.textContent = `${state.Z1} dientes`;
+                rebuildCompleteGearAssembly();
+                updateDynamicsAndUI();
+            });
+
+            // Slider Dientes Corona Z2
+            const sliderZ2 = document.getElementById('slider-z2');
+            const valZ2 = document.getElementById('val-z2');
+            sliderZ2.addEventListener('input', (e) => {
+                state.Z2 = parseInt(e.target.value, 10);
+                valZ2.textContent = `${state.Z2} dientes`;
+                rebuildCompleteGearAssembly();
+                updateDynamicsAndUI();
+            });
+
+            // Slider Ángulo de Espiral Beta
+            const sliderBeta = document.getElementById('slider-beta');
+            const valBeta = document.getElementById('val-beta');
+            sliderBeta.addEventListener('input', (e) => {
+                state.betaDeg = parseFloat(e.target.value);
+                valBeta.textContent = state.betaDeg === 0
+                    ? `0° (Cónico Recto)`
+                    : `${state.betaDeg}° (Helicoidal)`;
+                rebuildCompleteGearAssembly();
+                updateDynamicsAndUI();
+            });
+
+            // Slider Par Motor
+            const sliderTorque = document.getElementById('slider-torque');
+            const valTorque = document.getElementById('val-torque');
+            sliderTorque.addEventListener('input', (e) => {
+                state.torque = parseFloat(e.target.value);
+                valTorque.textContent = `${state.torque} Nm`;
+                updateDynamicsAndUI();
+            });
+
+            // Slider RPM
+            const sliderRpm = document.getElementById('slider-rpm');
+            const valRpm = document.getElementById('val-rpm');
+            sliderRpm.addEventListener('input', (e) => {
+                state.rpm = parseFloat(e.target.value);
+                valRpm.textContent = `${state.rpm} RPM`;
+            });
+
+            // Botón Invertir Giro
+            document.getElementById('btn-reverse').addEventListener('click', () => {
+                state.dirCW *= -1;
+                document.getElementById('txt-dir').textContent = state.dirCW > 0 ? 'Giro Piñón: Horario (CW)' : 'Giro Piñón: Antihorario (CCW)';
+                updateDynamicsAndUI();
+            });
+
+            // Botón Mano de Hélice
+            document.getElementById('btn-hand').addEventListener('click', () => {
+                state.pinionHand *= -1;
+                document.getElementById('txt-hand').textContent = state.pinionHand < 0 ? 'Piñón: Hélice Izq. (LH)' : 'Piñón: Hélice Der. (RH)';
+                rebuildCompleteGearAssembly();
+                updateDynamicsAndUI();
+            });
+
+            // Checkboxes de visibilidad
+            document.getElementById('chk-vectors').addEventListener('change', (e) => {
+                state.showVectors = e.target.checked;
+                vectorsGroup.visible = state.showVectors;
+            });
+
+            document.getElementById('chk-shafts').addEventListener('change', (e) => {
+                state.showShafts = e.target.checked;
+                pinionGroup.traverse(obj => { if (obj.name === "shaftPart") obj.visible = state.showShafts; });
+                gearGroup.traverse(obj => { if (obj.name === "shaftPart") obj.visible = state.showShafts; });
+                bearingsStaticGroup.traverse(obj => { if (obj.name === "staticBearings") obj.visible = state.showShafts; });
+            });
+
+            document.getElementById('chk-cones').addEventListener('change', (e) => {
+                state.showCones = e.target.checked;
+                bearingsStaticGroup.traverse(obj => { if (obj.name === "axesLines") obj.visible = state.showCones; });
+            });
+
+            document.getElementById('chk-pause').addEventListener('change', (e) => {
+                state.paused = e.target.checked;
+            });
+
+            // Vistas rápidas de cámara
+            document.getElementById('btn-view-iso').addEventListener('click', () => {
+                camCtrl.theta = 0.42;
+                camCtrl.phi = 1.32;
+                camCtrl.radius = 15.0;
+                camCtrl.target.set(-2.4, -2.4, 0.0);
+                updateCameraTransform();
+            });
+
+            document.getElementById('btn-view-mesh').addEventListener('click', () => {
+                camCtrl.theta = 0.14;
+                camCtrl.phi = 1.50;
+                camCtrl.radius = 8.5;
+                camCtrl.target.set(
+                    -geomParams.Rm * Math.cos(state.delta1),
+                    -geomParams.Rm * Math.sin(state.delta1),
+                    0.0
+                );
+                updateCameraTransform();
+            });
+
+            // Selector de paleta de colores de alto contraste
+            const btnTheme = document.getElementById('btn-theme');
+            btnTheme.addEventListener('click', () => {
+                state.themeIndex = (state.themeIndex + 1) % COLOR_THEMES.length;
+                const t = COLOR_THEMES[state.themeIndex];
+                pinionMat.color.setHex(t.pinionColor);
+                gearMat.color.setHex(t.gearColor);
+                shaftMat.color.setHex(t.shaftColor);
+                btnTheme.textContent = t.name;
+            });
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // ============================================================================
+        // BUCLE DE ANIMACIÓN SINCRONIZADO POR RELACIÓN DE TRANSMISIÓN (Z1 / Z2)
+        // ============================================================================
+        let pinionPhase = 0;
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (!state.paused && state.rpm > 0) {
+                const omega1 = (state.rpm * 2 * Math.PI) / 60;
+                pinionPhase += state.dirCW * omega1 * dt;
+            }
+
+            // Relación de giro exacta: la corona gira a -(Z1 / Z2) veces el ángulo del piñón
+            const gearPhase = -pinionPhase * (state.Z1 / state.Z2);
+
+            // Posicionamiento del Piñón 1 (su eje local +Y se alinea con el semieje -X global mediante rotación Z = +90°)
+            pinionGroup.rotation.set(0, 0, Math.PI / 2);
+            pinionGroup.rotateY(pinionPhase);
+
+            // Posicionamiento de la Corona 2 (su eje local +Y se alinea con el semieje -Y global mediante rotación Z = 180°)
+            gearGroup.rotation.set(0, 0, Math.PI);
+            gearGroup.rotateY(gearPhase);
+
+            updateFloatingLabels();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            initThree();
+            setupUIEvents();
+            updateDynamicsAndUI();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

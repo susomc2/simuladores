@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador 3D Interactivo de Palancas (1.º, 2.º y 3.º Género)</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --border-color: rgba(148, 163, 184, 0.22);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --color-fe: #38bdf8;
+      --color-fs: #fb7185;
+      --color-ra: #34d399;
+      --color-fulcro: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Paneles de interfaz */
+    .hud-panel {
+      position: absolute;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+      z-index: 10;
+    }
+
+    #top-bar {
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+    }
+
+    .title-block h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .title-block p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .metrics-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .metric-badge {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 110px;
+    }
+
+    .metric-badge span.label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .metric-badge span.value {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .genre-pill {
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+    }
+
+    /* Panel de controles izquierdo */
+    #controls-panel {
+      bottom: 20px;
+      left: 16px;
+      width: 340px;
+      max-width: calc(100vw - 32px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    button.preset-btn {
+      background: rgba(30, 41, 59, 0.95);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    button.preset-btn:hover {
+      background: #1e293b;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.78rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 10px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Etiquetas 2D flotantes sincronizadas con el espacio 3D */
+    #labels-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .vector-label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1.5px solid;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      transition: opacity 0.15s;
+    }
+
+    .label-fe {
+      color: var(--color-fe);
+      border-color: var(--color-fe);
+    }
+
+    .label-fs {
+      color: var(--color-fs);
+      border-color: var(--color-fs);
+    }
+
+    .label-ra {
+      color: var(--color-ra);
+      border-color: var(--color-ra);
+    }
+
+    .label-fulcro {
+      color: var(--color-fulcro);
+      border-color: var(--color-fulcro);
+      font-size: 0.76rem;
+    }
+  </style>
+
+  <!-- Import map para cargar Three.js y OrbitControls desde CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <div id="canvas-container">
+    <!-- Barra superior de estado y fórmulas -->
+    <div id="top-bar" class="hud-panel">
+      <div class="title-block">
+        <h1>Simulador 3D de Palancas</h1>
+        <p>Arrastra directamente sobre la barra el <b>Punto de Apoyo (amarillo)</b>, la <b>Fuerza de Entrada (azul)</b> o la <b>Fuerza de Salida (rojo)</b></p>
+      </div>
+
+      <div class="metrics-grid">
+        <div id="genre-badge" class="genre-pill">Palanca de 1.º Género</div>
+        <div class="metric-badge">
+          <span class="label">Brazo Entrada (dₑ)</span>
+          <span id="val-de" class="value">4.00 m</span>
+        </div>
+        <div class="metric-badge">
+          <span class="label">Brazo Salida (dₛ)</span>
+          <span id="val-ds" class="value">3.00 m</span>
+        </div>
+        <div class="metric-badge">
+          <span class="label">Ventaja Mecánica (VM)</span>
+          <span id="val-vm" class="value">1.33x</span>
+        </div>
+        <div class="metric-badge">
+          <span class="label">Momento (Torque)</span>
+          <span id="val-torque" class="value">360.0 N·m</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de controles inferior izquierdo -->
+    <div id="controls-panel" class="hud-panel">
+      <div class="control-group">
+        <div class="control-header">
+          <span>Longitud de la Palanca (L)</span>
+          <span id="lbl-length">10.0 m</span>
+        </div>
+        <input id="slider-length" type="range" min="4.0" max="14.0" step="0.2" value="10.0" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-header">
+          <span>Fuerza de Salida / Carga (Fₛ)</span>
+          <span id="lbl-fs">120 N</span>
+        </div>
+        <input id="slider-fs" type="range" min="20" max="250" step="5" value="120" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-header">
+          <span>Preconfigurar Género:</span>
+        </div>
+        <div class="preset-buttons">
+          <button class="preset-btn" id="btn-gen1">1.º Género</button>
+          <button class="preset-btn" id="btn-gen2">2.º Género</button>
+          <button class="preset-btn" id="btn-gen3">3.º Género</button>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="dot" style="background: var(--color-fulcro);"></span>
+          <span><b>Fulcro (Apoyo):</b> Deslízalo sin que la barra se mueva de su sitio.</span>
+        </div>
+        <div class="legend-item">
+          <span class="dot" style="background: var(--color-fe);"></span>
+          <span><b>Fuerza de Entrada (Fₑ):</b> Escala su tamaño según $F_e = F_s \cdot (d_s / d_e)$.</span>
+        </div>
+        <div class="legend-item">
+          <span class="dot" style="background: var(--color-fs);"></span>
+          <span><b>Fuerza de Salida (Fₛ):</b> Resistencia o carga aplicada sobre la barra.</span>
+        </div>
+        <div class="legend-item">
+          <span class="dot" style="background: var(--color-ra);"></span>
+          <span><b>Reacción en el Apoyo (Rₐ):</b> Fuerza que soporta el fulcro.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capa de etiquetas flotantes -->
+    <div id="labels-layer">
+      <div id="label-fe" class="vector-label label-fe">Fₑ = 90.0 N</div>
+      <div id="label-fs" class="vector-label label-fs">Fₛ = 120.0 N</div>
+      <div id="label-ra" class="vector-label label-ra">Rₐ = 210.0 N</div>
+      <div id="label-fulcro" class="vector-label label-fulcro">Apoyo (x = 0.0 m)</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // =========================================================
+    // 1. ESTADO FÍSICO DE LA PALANCA
+    // =========================================================
+    const state = {
+      L: 10.0,       // Longitud de la barra (m)
+      xf: 0.0,       // Posición del punto de apoyo (m)
+      xe: 4.0,       // Posición de la fuerza de entrada (m)
+      xs: -3.0,      // Posición de la fuerza de salida (m)
+      Fs: 120.0,     // Magnitud de la fuerza de salida (N)
+      Fe: 90.0,      // Magnitud calculada de la fuerza de entrada (N)
+      Ra: 210.0,     // Magnitud de la fuerza de reacción en el fulcro (N)
+      dirFe: -1,     // Sentido de Fe: -1 hacia abajo, +1 hacia arriba
+      dirRa: 1,      // Sentido de Ra: +1 hacia arriba, -1 hacia abajo
+      de: 4.0,       // Brazo de entrada (m)
+      ds: 3.0,       // Brazo de salida (m)
+      vm: 1.33,      // Ventaja mecánica
+      genero: 'Palanca de 1.º Género'
+    };
+
+    // Factor de escala visual: cuántos metros 3D mide una flecha por cada Newton
+    const SCALE_NEWTON_TO_METERS = 0.018;
+    const MIN_ARM_DISTANCE = 0.25; // Evita división por cero si coinciden en el mismo punto
+
+    // =========================================================
+    // 2. INICIALIZACIÓN DE ESCENA THREE.JS
+    // =========================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      200
+    );
+    camera.position.set(0, 4.8, 15.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 0.5, 0);
+
+    // Iluminación
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(8, 16, 12);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    // Cuadrícula de referencia en el suelo
+    const gridHelper = new THREE.GridHelper(24, 24, 0x334155, 0x1e293b);
+    gridHelper.position.y = -2.2;
+    scene.add(gridHelper);
+
+    // =========================================================
+    // 3. CONSTRUCCIÓN DE OBJETOS 3D (BARRA FIJA, FULCRO Y VECTORES)
+    // =========================================================
+    const BEAM_HEIGHT = 0.28;
+    const BEAM_DEPTH = 0.65;
+
+    // 3.1. Barra rígida (siempre centrada en x = 0)
+    const beamGeometry = new THREE.BoxGeometry(1, BEAM_HEIGHT, BEAM_DEPTH);
+    const beamMaterial = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.35,
+      roughness: 0.45
+    });
+    const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
+    beamMesh.castShadow = true;
+    beamMesh.receiveShadow = true;
+    scene.add(beamMesh);
+
+    // Grupo para marcas de graduación (cada 1 metro) sobre la barra
+    const ticksGroup = new THREE.Group();
+    scene.add(ticksGroup);
+
+    function rebuildTicks(length) {
+      while (ticksGroup.children.length > 0) {
+        const child = ticksGroup.children.pop();
+        child.geometry.dispose();
+      }
+      const half = Math.floor(length / 2);
+      const tickGeo = new THREE.BoxGeometry(0.04, 0.03, BEAM_DEPTH + 0.04);
+      const tickMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+
+      for (let x = -half; x <= half; x++) {
+        const tick = new THREE.Mesh(tickGeo, tickMat);
+        tick.position.set(x, BEAM_HEIGHT / 2 + 0.015, 0);
+        ticksGroup.add(tick);
+      }
+    }
+
+    // 3.2. Punto de apoyo (Fulcro arrastrable)
+    const fulcrumGroup = new THREE.Group();
+    const fulcrumGeo = new THREE.CylinderGeometry(0.05, 0.65, 1.1, 3);
+    fulcrumGeo.rotateY(Math.PI / 2);
+    const fulcrumMat = new THREE.MeshStandardMaterial({
+      color: 0xfbbf24,
+      metalness: 0.2,
+      roughness: 0.4
+    });
+    const fulcrumMesh = new THREE.Mesh(fulcrumGeo, fulcrumMat);
+    fulcrumMesh.position.y = -BEAM_HEIGHT / 2 - 0.55;
+    fulcrumGroup.add(fulcrumMesh);
+
+    // Base deslizante del fulcro
+    const baseGeo = new THREE.BoxGeometry(1.3, 0.16, 1.0);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = -BEAM_HEIGHT / 2 - 1.15;
+    fulcrumGroup.add(baseMesh);
+
+    scene.add(fulcrumGroup);
+
+    // 3.3. Generador de Flechas Vectoriales 3D con anillo de agarre
+    function createForceVector3D(colorHex, name) {
+      const group = new THREE.Group();
+      group.name = name;
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        metalness: 0.2,
+        roughness: 0.35
+      });
+
+      // Esfera/collarín de agarre sobre la barra para deslizar cómodamente
+      const handleGeo = new THREE.SphereGeometry(0.28, 24, 24);
+      const handleMesh = new THREE.Mesh(handleGeo, mat);
+      handleMesh.name = name;
+      group.add(handleMesh);
+
+      // Vástago cilíndrico (escala con la magnitud de la fuerza)
+      const shaftGeo = new THREE.CylinderGeometry(0.09, 0.09, 1, 20);
+      const shaftMesh = new THREE.Mesh(shaftGeo, mat);
+      shaftMesh.name = name;
+      group.add(shaftMesh);
+
+      // Punta cónica de la flecha
+      const headGeo = new THREE.ConeGeometry(0.24, 0.48, 24);
+      const headMesh = new THREE.Mesh(headGeo, mat);
+      headMesh.name = name;
+      group.add(headMesh);
+
+      group.userData = { handleMesh, shaftMesh, headMesh, mat };
+      return group;
+    }
+
+    const vectorFe = createForceVector3D(0x38bdf8, 'drag_fe');
+    const vectorFs = createForceVector3D(0xfb7185, 'drag_fs');
+    const vectorRa = createForceVector3D(0x34d399, 'vector_ra');
+    // Ocultamos la esfera de agarre en Ra porque se mueve solidaria al fulcro
+    vectorRa.userData.handleMesh.visible = false;
+
+    scene.add(vectorFe);
+    scene.add(vectorFs);
+    scene.add(vectorRa);
+
+    // Etiquetamos el fulcro para detección de raycasting
+    fulcrumMesh.name = 'drag_fulcro';
+    baseMesh.name = 'drag_fulcro';
+
+    const draggableMeshes = [
+      fulcrumMesh,
+      baseMesh,
+      vectorFe.userData.handleMesh,
+      vectorFe.userData.shaftMesh,
+      vectorFe.userData.headMesh,
+      vectorFs.userData.handleMesh,
+      vectorFs.userData.shaftMesh,
+      vectorFs.userData.headMesh
+    ];
+
+    // Función para escalar y orientar una flecha 3D según su magnitud (N) y sentido
+    function updateArrowGeometry(vectorGroup, magnitudeN, directionSign, yOffsetStart) {
+      const { shaftMesh, headMesh } = vectorGroup.userData;
+      const totalLength = Math.max(0.6, Math.min(magnitudeN * SCALE_NEWTON_TO_METERS, 6.5));
+      const headLength = 0.48;
+      const shaftLength = Math.max(0.15, totalLength - headLength);
+
+      shaftMesh.scale.set(1, shaftLength, 1);
+
+      // Si el vector apunta hacia abajo (directionSign = -1) o hacia arriba (+1),
+      // colocamos la punta de la flecha tocando la barra o saliendo de ella claramente
+      if (directionSign < 0) {
+        // Flecha apuntando hacia abajo (presiona o tira hacia -Y)
+        shaftMesh.position.y = yOffsetStart + headLength + shaftLength / 2;
+        headMesh.rotation.x = Math.PI;
+        headMesh.position.y = yOffsetStart + headLength / 2;
+        vectorGroup.userData.labelAnchorY = yOffsetStart + totalLength + 0.35;
+      } else {
+        // Flecha apuntando hacia arriba (+Y)
+        shaftMesh.position.y = yOffsetStart - headLength - shaftLength / 2;
+        headMesh.rotation.x = 0;
+        headMesh.position.y = yOffsetStart - headLength / 2;
+        vectorGroup.userData.labelAnchorY = yOffsetStart - totalLength - 0.35;
+      }
+    }
+
+    // =========================================================
+    // 4. CÁLCULO FÍSICO Y ACTUALIZACIÓN DE LA ESCENA
+    // =========================================================
+    function clampToBeam(x) {
+      const halfL = state.L / 2;
+      return Math.max(-halfL, Math.min(halfL, x));
+    }
+
+    function updatePhysicsAndScene() {
+      // 1. Asegurar que ningún elemento quede fuera de la barra al cambiar L
+      state.xf = clampToBeam(state.xf);
+      state.xe = clampToBeam(state.xe);
+      state.xs = clampToBeam(state.xs);
+
+      // 2. Actualizar tamaño de la barra (la barra SIEMPRE queda fija en x = 0)
+      beamMesh.scale.set(state.L, 1, 1);
+      rebuildTicks(state.L);
+
+      // 3. Calcular brazos de palanca
+      const relE = state.xe - state.xf;
+      const relS = state.xs - state.xf;
+      state.de = Math.abs(relE);
+      state.ds = Math.abs(relS);
+
+      const safeDe = Math.max(state.de, MIN_ARM_DISTANCE);
+
+      // 4. Determinar género de la palanca y sentido de los vectores
+      // La carga Fs actúa siempre hacia abajo (-1)
+      if (relE * relS < 0) {
+        // El punto de apoyo está ENTRE la fuerza de entrada y la de salida
+        state.genero = 'Palanca de 1.º Género';
+        state.dirFe = -1; // Fe empuja hacia abajo en el lado opuesto
+        state.Fe = state.Fs * (state.ds / safeDe);
+        state.Ra = state.Fs + state.Fe;
+        state.dirRa = 1;  // El apoyo soporta la suma hacia arriba
+      } else {
+        // Ambas fuerzas están al mismo lado del punto de apoyo:
+        // Como Fs tira hacia abajo, Fe debe tirar hacia arriba (+1) para equilibrar el momento
+        state.dirFe = 1;
+        state.Fe = state.Fs * (state.ds / safeDe);
+
+        const netVerticalForce = state.Fs - state.Fe; // Hacia abajo positivo
+        state.Ra = Math.abs(netVerticalForce);
+        state.dirRa = netVerticalForce >= 0 ? 1 : -1;
+
+        if (state.de >= state.ds) {
+          state.genero = 'Palanca de 2.º Género';
+        } else {
+          state.genero = 'Palanca de 3.º Género';
+        }
+      }
+
+      state.vm = state.de / Math.max(state.ds, 0.01);
+      const torque = state.Fs * state.ds;
+
+      // 5. Posicionar elementos 3D sobre la barra fija
+      fulcrumGroup.position.x = state.xf;
+      vectorFe.position.x = state.xe;
+      vectorFs.position.x = state.xs;
+      vectorRa.position.x = state.xf;
+
+      // 6. Actualizar longitud de los vectores en función de su valor numérico
+      const topSurfaceY = BEAM_HEIGHT / 2;
+      const bottomSurfaceY = -BEAM_HEIGHT / 2;
+
+      // Fuerza de salida (Fs) siempre hacia abajo
+      updateArrowGeometry(vectorFs, state.Fs, -1, topSurfaceY);
+
+      // Fuerza de entrada (Fe) hacia abajo en 1.º género, hacia arriba en 2.º y 3.º
+      updateArrowGeometry(
+        vectorFe,
+        state.Fe,
+        state.dirFe,
+        state.dirFe < 0 ? topSurfaceY : bottomSurfaceY
+      );
+
+      // Reacción en el apoyo (Ra)
+      updateArrowGeometry(
+        vectorRa,
+        state.Ra,
+        state.dirRa,
+        state.dirRa > 0 ? bottomSurfaceY - 1.15 : topSurfaceY
+      );
+
+      // 7. Actualizar textos del panel superior
+      document.getElementById('genre-badge').textContent = state.genero;
+      document.getElementById('val-de').textContent = `${state.de.toFixed(2)} m`;
+      document.getElementById('val-ds').textContent = `${state.ds.toFixed(2)} m`;
+      document.getElementById('val-vm').textContent = `${state.vm.toFixed(2)}x`;
+      document.getElementById('val-torque').textContent = `${torque.toFixed(1)} N·m`;
+
+      // Actualizar textos de etiquetas flotantes
+      document.getElementById('label-fe').textContent =
+        `Fₑ = ${state.Fe.toFixed(1)} N (x = ${state.xe.toFixed(1)} m)`;
+      document.getElementById('label-fs').textContent =
+        `Fₛ = ${state.Fs.toFixed(1)} N (x = ${state.xs.toFixed(1)} m)`;
+      document.getElementById('label-ra').textContent =
+        `Rₐ = ${state.Ra.toFixed(1)} N`;
+      document.getElementById('label-fulcro').textContent =
+        `Apoyo (x = ${state.xf.toFixed(1)} m)`;
+    }
+
+    // =========================================================
+    // 5. INTERACCIÓN GRÁFICA: SELECCIÓN Y ARRASTRE SOBRE LA BARRA
+    // =========================================================
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    // Plano vertical Z=0 para proyectar el deslizamiento horizontal sobre la barra
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const planeIntersectPoint = new THREE.Vector3();
+
+    let activeDragTarget = null; // 'drag_fulcro' | 'drag_fe' | 'drag_fs'
+
+    function updatePointerCoords(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+      updatePointerCoords(event);
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(draggableMeshes, false);
+
+      if (intersects.length > 0) {
+        activeDragTarget = intersects[0].object.name;
+        controls.enabled = false; // Desactivar rotación de cámara mientras se desliza un elemento
+        document.body.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('pointermove', (event) => {
+      updatePointerCoords(event);
+      raycaster.setFromCamera(pointer, camera);
+
+      if (activeDragTarget) {
+        if (raycaster.ray.intersectPlane(dragPlane, planeIntersectPoint)) {
+          const clampedX = clampToBeam(planeIntersectPoint.x);
+
+          if (activeDragTarget === 'drag_fulcro') {
+            state.xf = clampedX;
+          } else if (activeDragTarget === 'drag_fe') {
+            state.xe = clampedX;
+          } else if (activeDragTarget === 'drag_fs') {
+            state.xs = clampedX;
+          }
+          updatePhysicsAndScene();
+        }
+        return;
+      }
+
+      // Cambiar el cursor al pasar sobre los elementos interactivos
+      const hoverIntersects = raycaster.intersectObjects(draggableMeshes, false);
+      document.body.style.cursor = hoverIntersects.length > 0 ? 'grab' : 'default';
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (activeDragTarget) {
+        activeDragTarget = null;
+        controls.enabled = true;
+        document.body.style.cursor = 'default';
+      }
+    });
+
+    // =========================================================
+    // 6. CONTROLES DE INTERFAZ Y PRECONFIGURACIONES DE LOS 3 GÉNEROS
+    // =========================================================
+    const sliderLength = document.getElementById('slider-length');
+    const lblLength = document.getElementById('lbl-length');
+    sliderLength.addEventListener('input', (e) => {
+      state.L = parseFloat(e.target.value);
+      lblLength.textContent = `${state.L.toFixed(1)} m`;
+      updatePhysicsAndScene();
+    });
+
+    const sliderFs = document.getElementById('slider-fs');
+    const lblFs = document.getElementById('lbl-fs');
+    sliderFs.addEventListener('input', (e) => {
+      state.Fs = parseFloat(e.target.value);
+      lblFs.textContent = `${state.Fs.toFixed(0)} N`;
+      updatePhysicsAndScene();
+    });
+
+    // Botón 1.º Género: Fulcro entre ambas fuerzas
+    document.getElementById('btn-gen1').addEventListener('click', () => {
+      const half = state.L / 2;
+      state.xf = 0.0;
+      state.xs = -half * 0.6;
+      state.xe = half * 0.8;
+      updatePhysicsAndScene();
+    });
+
+    // Botón 2.º Género: Fuerza de salida (resistencia) entre el fulcro y la fuerza de entrada
+    document.getElementById('btn-gen2').addEventListener('click', () => {
+      const half = state.L / 2;
+      state.xf = -half * 0.85;
+      state.xs = 0.0;
+      state.xe = half * 0.85;
+      updatePhysicsAndScene();
+    });
+
+    // Botón 3.º Género: Fuerza de entrada (potencia) entre el fulcro y la fuerza de salida
+    document.getElementById('btn-gen3').addEventListener('click', () => {
+      const half = state.L / 2;
+      state.xf = -half * 0.85;
+      state.xe = 0.0;
+      state.xs = half * 0.85;
+      updatePhysicsAndScene();
+    });
+
+    // =========================================================
+    // 7. SINCRONIZACIÓN DE ETIQUETAS 2D Y BUCLE DE RENDERIZADO
+    // =========================================================
+    const tempVec = new THREE.Vector3();
+
+    function projectToScreen(x, y, z, element) {
+      tempVec.set(x, y, z);
+      tempVec.project(camera);
+
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+      const screenX = tempVec.x * halfW + halfW;
+      const screenY = -tempVec.y * halfH + halfH;
+
+      element.style.left = `${screenX}px`;
+      element.style.top = `${screenY}px`;
+    }
+
+    function updateFloatingLabels() {
+      projectToScreen(
+        vectorFe.position.x,
+        vectorFe.userData.labelAnchorY,
+        0,
+        document.getElementById('label-fe')
+      );
+      projectToScreen(
+        vectorFs.position.x,
+        vectorFs.userData.labelAnchorY,
+        0,
+        document.getElementById('label-fs')
+      );
+      projectToScreen(
+        vectorRa.position.x,
+        vectorRa.userData.labelAnchorY,
+        0,
+        document.getElementById('label-ra')
+      );
+      projectToScreen(
+        fulcrumGroup.position.x,
+        -1.95,
+        0.65,
+        document.getElementById('label-fulcro')
+      );
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Inicializar estado
+    updatePhysicsAndScene();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      updateFloatingLabels();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
