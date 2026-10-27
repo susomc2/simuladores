@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador Electrónico Modular - I.E.S. Galileo Galilei</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #22c55e;
+    --danger: #ef4444;
+    --warn: #eab308;
+  }
+  * { box-sizing: border-box; user-select: none; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 6px 14px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo-box {
+    width: 54px; height: 48px; background: #fff; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; padding: 2px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .brand-text h1 { margin: 0; font-size: 16px; color: var(--accent); letter-spacing: 0.3px; }
+  .brand-text p { margin: 1px 0 0; font-size: 12px; color: #e2e8f0; font-weight: 500; }
+  .toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  button, select {
+    background: #0f172a; color: var(--text); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: 0.15s;
+  }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.active { background: #0284c7; border-color: var(--accent); font-weight: 600; }
+  button.lib-btn { background: #1e3a8a; border-color: #3b82f6; color: #e0f2fe; font-weight: 600; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .sidebar {
+    width: 235px; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px;
+  }
+  .sec-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin: 8px 0 2px; font-weight: 700;
+  }
+  .tool-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; text-align: left; padding: 7px 10px; font-size: 12.5px;
+  }
+  .badge-ext {
+    font-size: 9px; background: #0284c7; color: #fff; padding: 1px 5px;
+    border-radius: 4px; font-weight: bold;
+  }
+  .canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0b1120; }
+  canvas { display: block; cursor: crosshair; }
+  .right-panel {
+    width: 270px; background: var(--panel); border-left: 1px solid var(--border);
+    padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  }
+  .card {
+    background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+  .field { margin-bottom: 8px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .field input[type="number"], .field input[type="range"] {
+    width: 100%; background: #1e293b; border: 1px solid var(--border);
+    color: #fff; padding: 5px; border-radius: 4px;
+  }
+  #tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 100;
+    background: rgba(15, 23, 42, 0.96); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 10px 12px; font-size: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6); min-width: 220px;
+  }
+  #tooltip h4 { margin: 0 0 6px; color: var(--accent); font-size: 13px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+  .kv { display: flex; justify-content: space-between; margin: 3px 0; gap: 12px; }
+  .kv span:first-child { color: var(--muted); }
+  .kv span:last-child { font-family: monospace; font-weight: 600; color: #f8fafc; }
+  .hint-bar {
+    position: absolute; bottom: 10px; left: 12px; background: rgba(30,41,59,0.92);
+    border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;
+    font-size: 11.5px; color: #cbd5e1; pointer-events: none;
+  }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none;
+    align-items: center; justify-content: center; z-index: 200;
+  }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    max-width: 480px; padding: 18px; color: var(--text); font-size: 13px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo-box" title="I.E.S. Galileo Galilei">
+      <svg viewBox="0 0 120 105" width="50" height="44">
+        <g fill="none" stroke="#000" stroke-width="2.2">
+          <ellipse cx="60" cy="52" rx="48" ry="20" transform="rotate(-38 60 52)"/>
+          <ellipse cx="62" cy="55" rx="40" ry="16" transform="rotate(-48 62 55)"/>
+        </g>
+        <circle cx="86" cy="12" r="5.5" fill="#000"/><circle cx="87.5" cy="10.5" r="1" fill="#38bdf8"/>
+        <circle cx="94" cy="34" r="5" fill="#000"/><circle cx="95.5" cy="32.5" r="1" fill="#38bdf8"/>
+        <circle cx="42" cy="82" r="5" fill="#000"/><circle cx="43.5" cy="80.5" r="1" fill="#38bdf8"/>
+        <circle cx="52" cy="95" r="5" fill="#000"/><circle cx="53.5" cy="93.5" r="1" fill="#38bdf8"/>
+        <rect x="8" y="54" width="104" height="18" fill="#fff"/>
+        <text x="59" y="50" text-anchor="middle" font-family="Georgia, serif" font-size="23" font-weight="bold" fill="#000">⅁G</text>
+        <text x="60" y="67" text-anchor="middle" font-family="cursive, Georgia, serif" font-style="italic" font-weight="bold" font-size="11.5" fill="#000">I.E.S. Galileo Galilei</text>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <h1>IES Galileo Galilei</h1>
+      <p>Autor: Jesús Moreno Calvo</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="btnRun" class="active" onclick="toggleSim()">▶ Simular</button>
+    <button id="btnCurr" class="active" onclick="toggleCurrentAnim()">⚡ Corriente: ON</button>
+    <button id="btnCurve" onclick="toggleWireStyle()">📐 Cables: Rectos</button>
+    <button onclick="rotateSelected()" title="Atajo: Tecla R">↻ Rotar (R)</button>
+    <button class="lib-btn" onclick="document.getElementById('libInput').click()" title="Cargar archivo .js de componente">➕ Cargar Librería (.js)</button>
+    <input type="file" id="libInput" accept=".js" multiple style="display:none" onchange="loadExternalLibraryFiles(event)">
+    <button onclick="saveCircuit()">💾 Guardar</button>
+    <button onclick="document.getElementById('fileInput').click()">📂 Recuperar</button>
+    <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadCircuit(event)">
+    <select id="presetSelect" onchange="loadPreset(this.value)">
+      <option value="npn">Ejemplo: Transistor NPN</option>
+      <option value="pnp">Ejemplo: Transistor PNP</option>
+      <option value="rect">Ejemplo: Rectificador AC + Filtro</option>
+      <option value="zener_reg">Ejemplo: Regulador Zener</option>
+    </select>
+    <button onclick="clearAll()">🗑 Limpiar</button>
+    <button onclick="document.getElementById('mitModal').style.display='flex'">⚖ Licencia MIT</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar" id="sidebarMenu">
+    <div class="sec-title">Edición y Trazado</div>
+    <button class="tool-btn active" data-tool="select" onclick="setTool('select')"><span>🖱 Seleccionar / Mover</span></button>
+    <button class="tool-btn" data-tool="wire" onclick="setTool('wire')"><span>📏 Cable Ortogonal</span></button>
+    <button class="tool-btn" data-tool="delete" onclick="setTool('delete')"><span>✂ Borrar Elemento</span></button>
+
+    <div class="sec-title">Fuentes y Tierra</div>
+    <div id="cat-fuentes" style="display:flex;flex-direction:column;gap:5px;">
+      <button class="tool-btn" data-tool="dc" onclick="setTool('dc')"><span>🔋 Pila / Fuente DC</span></button>
+      <button class="tool-btn" data-tool="ac" onclick="setTool('ac')"><span>〰 Fuente Alterna (AC)</span></button>
+      <button class="tool-btn" data-tool="gnd" onclick="setTool('gnd')"><span>⏚ Tierra (GND = 0V)</span></button>
+    </div>
+
+    <div class="sec-title">Elementos Pasivos</div>
+    <div id="cat-pasivos" style="display:flex;flex-direction:column;gap:5px;">
+      <button class="tool-btn" data-tool="res" onclick="setTool('res')"><span>🗲 Resistencia Fija</span></button>
+      <button class="tool-btn" data-tool="vres" onclick="setTool('vres')"><span>🎚 Resistencia Variable</span></button>
+      <button class="tool-btn" data-tool="cap" onclick="setTool('cap')"><span>⏸ Condensador Fijo</span></button>
+      <button class="tool-btn" data-tool="vcap" onclick="setTool('vcap')"><span>🎛 Condensador Variable</span></button>
+    </div>
+
+    <div class="sec-title">Semiconductores</div>
+    <div id="cat-semiconductores" style="display:flex;flex-direction:column;gap:5px;">
+      <button class="tool-btn" data-tool="diode" onclick="setTool('diode')"><span>▶| Diodo Rectificador</span></button>
+      <button class="tool-btn" data-tool="npn" onclick="setTool('npn')"><span>Transistor NPN (BJT)</span></button>
+      <button class="tool-btn" data-tool="pnp" onclick="setTool('pnp')"><span>Transistor PNP (BJT)</span></button>
+    </div>
+
+    <div class="sec-title">Librerías Externas</div>
+    <div id="cat-librerias" style="display:flex;flex-direction:column;gap:5px;">
+      <div id="noLibMsg" style="font-size:11px; color:var(--muted); padding:4px;">Ninguna librería cargada aún.</div>
+    </div>
+  </aside>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="cv"></canvas>
+    <div class="hint-bar" id="hint">
+      Sistema modular activo: coloca tus archivos .js en la misma carpeta o usa "➕ Cargar Librería (.js)".
+    </div>
+  </div>
+
+  <aside class="right-panel">
+    <div class="card" id="propCard">
+      <h3>Propiedades del Elemento</h3>
+      <div id="propContent" style="font-size:12px; color:var(--muted);">
+        Haz clic sobre un componente o cable en el lienzo para editar sus parámetros o geometría.
+      </div>
+    </div>
+    <div class="card">
+      <h3>Arquitectura de Librerías</h3>
+      <ul style="margin:0; padding-left:16px; font-size:11.5px; color:#cbd5e1; line-height:1.55;">
+        <li>Cada nuevo elemento se diseña en un archivo independiente (ej. <code>lib_zener.js</code>) en la misma carpeta.</li>
+        <li>Usa la función global <code>RegistrarComponente({...})</code> para definir sus pines, dibujo, ecuación MNA y tooltip.</li>
+        <li>Puedes cargarlo automáticamente con <code>&lt;script src="lib_zener.js"&gt;&lt;/script&gt;</code> o con el botón superior <b>➕ Cargar Librería</b>.</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+<div id="tooltip"></div>
+
+<div class="modal" id="mitModal" onclick="this.style.display='none'">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 style="margin-top:0; color:var(--accent);">Licencia MIT</h3>
+    <p><b>Copyright © 2026 Jesús Moreno Calvo — I.E.S. Galileo Galilei</b></p>
+    <p>Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia de este software y de los archivos de documentación asociados, para utilizar el Software sin restricción, incluyendo sin limitación los derechos de usar, copiar, modificar, fusionar, publicar, distribuir, sublicenciar y/o vender copias del Software, sujeto a mantener el aviso de copyright anterior.</p>
+    <button onclick="document.getElementById('mitModal').style.display='none'" style="margin-top:8px; width:100%;">Cerrar</button>
+  </div>
+</div>
+
+<script>
+const GRID = 20;
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const wrap = document.getElementById('wrap');
+const tooltip = document.getElementById('tooltip');
+
+let tool = 'select';
+let simRunning = true;
+let showCurrent = true;
+let curvedWires = false;
+let simTime = 0;
+const DT = 1 / 1200;
+
+let comps = [];
+let wires = [];
+let selected = null;
+let hovered = null;
+
+// ============================================================================
+// REGISTRO MODULAR DE LIBRERÍAS DE COMPONENTES EXTERNOS
+// ============================================================================
+const COMPONENT_LIBRARY = new Map();
+
+window.RegistrarComponente = function(def) {
+  if (!def || !def.type) return;
+  COMPONENT_LIBRARY.set(def.type, def);
+
+  // Añadir botón al menú lateral si no existe ya
+  const noLib = document.getElementById('noLibMsg');
+  if (noLib) noLib.style.display = 'none';
+
+  let container = document.getElementById('cat-' + (def.category || 'librerias'));
+  if (!container) container = document.getElementById('cat-librerias');
+
+  let existingBtn = document.querySelector(`.tool-btn[data-tool="${def.type}"]`);
+  if (!existingBtn) {
+    const btn = document.createElement('button');
+    btn.className = 'tool-btn';
+    btn.dataset.tool = def.type;
+    btn.onclick = () => setTool(def.type);
+    btn.innerHTML = `<span>${def.icon || '🔌'} ${def.name}</span><span class="badge-ext">LIB</span>`;
+    container.appendChild(btn);
+  }
+  console.log(`Librería cargada correctamente: [${def.type}] ${def.name}`);
+};
+
+// Permite cargar archivos .js en caliente desde el botón "➕ Cargar Librería (.js)"
+function loadExternalLibraryFiles(event) {
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const script = document.createElement('script');
+        script.textContent = ev.target.result;
+        document.body.appendChild(script);
+      } catch (err) {
+        alert('Error al cargar la librería ' + file.name + ': ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+  event.target.value = '';
+}
+
+// Estados de interacción con ratón
+let draggingComp = null;
+let dragOffset = {x:0, y:0};
+let attachedWireEnds = [];
+let drawingWire = null;
+let draggingSegment = null;
+
+function resize() {
+  cv.width = wrap.clientWidth;
+  cv.height = wrap.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const snap = v => Math.round(v / GRID) * GRID;
+const uid = () => 'id_' + Math.random().toString(36).slice(2, 9);
+
+function formatUnit(val, unit) {
+  const a = Math.abs(val);
+  if (a < 1e-9 || isNaN(a)) return '0.00 ' + unit;
+  if (a >= 1e6) return (val/1e6).toFixed(2) + ' M' + unit;
+  if (a >= 1e3) return (val/1e3).toFixed(2) + ' k' + unit;
+  if (a >= 1) return val.toFixed(2) + ' ' + unit;
+  if (a >= 1e-3) return (val*1e3).toFixed(2) + ' m' + unit;
+  if (a >= 1e-6) return (val*1e6).toFixed(2) + ' µ' + unit;
+  return (val*1e9).toFixed(2) + ' n' + unit;
+}
+
+// Geometría de terminales (soporta componentes internos y de librería externa)
+function getPins(c) {
+  const r = (c.rot || 0) * Math.PI / 2;
+  const rotPt = (px, py) => ({
+    x: snap(c.x + Math.round(px * Math.cos(r) - py * Math.sin(r))),
+    y: snap(c.y + Math.round(px * Math.sin(r) + py * Math.cos(r)))
+  });
+
+  if (COMPONENT_LIBRARY.has(c.type)) {
+    const def = COMPONENT_LIBRARY.get(c.type);
+    const rawPins = def.pins ? def.pins(c) : [{x:-40, y:0, name:'1'}, {x:40, y:0, name:'2'}];
+    return rawPins.map(p => {
+      const rp = rotPt(p.x, p.y);
+      return {x: rp.x, y: rp.y, lx: p.x, ly: p.y, name: p.name || ''};
+    });
+  }
+
+  if (c.type === 'gnd') {
+    const p = rotPt(0, -20);
+    return [{x: p.x, y: p.y, lx: 0, ly: -20, name: 'GND'}];
+  }
+  if (c.type === 'npn' || c.type === 'pnp') {
+    const pB = rotPt(-40, 0);
+    const pC = rotPt(20, -40);
+    const pE = rotPt(20, 40);
+    return [
+      {x: pB.x, y: pB.y, lx: -40, ly: 0, name: 'B'},
+      {x: pC.x, y: pC.y, lx: 20, ly: -40, name: 'C'},
+      {x: pE.x, y: pE.y, lx: 20, ly: 40, name: 'E'}
+    ];
+  }
+  const p1 = rotPt(-40, 0);
+  const p2 = rotPt(40, 0);
+  return [
+    {x: p1.x, y: p1.y, lx: -40, ly: 0, name: '1'},
+    {x: p2.x, y: p2.y, lx: 40, ly: 0, name: '2'}
+  ];
+}
+
+function makeOrthoPoints(x1, y1, x2, y2, flip = false) {
+  if (x1 === x2 || y1 === y2) return [{x:x1, y:y1}, {x:x2, y:y2}];
+  const mid = flip ? {x: x1, y: y2} : {x: x2, y: y1};
+  return [{x:x1, y:y1}, mid, {x:x2, y:y2}];
+}
+
+function simplifyOrtho(pts) {
+  if (!pts || pts.length <= 2) return pts;
+  const clean = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = clean[clean.length - 1];
+    if (pts[i].x !== prev.x || pts[i].y !== prev.y) clean.push(pts[i]);
+  }
+  if (clean.length <= 2) return clean;
+  const out = [clean[0]];
+  for (let i = 1; i < clean.length - 1; i++) {
+    const a = out[out.length - 1], b = clean[i], c = clean[i + 1];
+    if ((a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y)) continue;
+    out.push(b);
+  }
+  out.push(clean[clean.length - 1]);
+  return out;
+}
+
+function pointInsideOrthoSeg(px, py, x1, y1, x2, y2) {
+  if (x1 === x2 && px === x1) {
+    const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+    return py > minY && py < maxY;
+  }
+  if (y1 === y2 && py === y1) {
+    const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+    return px > minX && px < maxX;
+  }
+  return false;
+}
+
+function splitWiresAtJunctions() {
+  let changed = true;
+  let guard = 0;
+  while (changed && guard < 60) {
+    changed = false;
+    guard++;
+    const jPts = [];
+    comps.forEach(c => getPins(c).forEach(p => jPts.push({x: p.x, y: p.y})));
+    wires.forEach(w => {
+      if (w.pts.length >= 2) {
+        jPts.push({x: w.pts[0].x, y: w.pts[0].y});
+        jPts.push({x: w.pts[w.pts.length - 1].x, y: w.pts[w.pts.length - 1].y});
+      }
+    });
+
+    for (let wi = 0; wi < wires.length; wi++) {
+      const w = wires[wi];
+      let splitDone = false;
+      for (const jp of jPts) {
+        const pStart = w.pts[0], pEnd = w.pts[w.pts.length - 1];
+        if ((jp.x === pStart.x && jp.y === pStart.y) || (jp.x === pEnd.x && jp.y === pEnd.y)) continue;
+
+        for (let si = 0; si < w.pts.length - 1; si++) {
+          const a = w.pts[si], b = w.pts[si + 1];
+          if (si > 0 && jp.x === a.x && jp.y === a.y) {
+            const pts1 = simplifyOrtho(w.pts.slice(0, si + 1).map(p => ({...p})));
+            const pts2 = simplifyOrtho(w.pts.slice(si).map(p => ({...p})));
+            wires.splice(wi, 1, {id: uid(), pts: pts1, v:0, i:0}, {id: uid(), pts: pts2, v:0, i:0});
+            changed = true; splitDone = true; break;
+          }
+          if (pointInsideOrthoSeg(jp.x, jp.y, a.x, a.y, b.x, b.y)) {
+            const pts1 = simplifyOrtho([...w.pts.slice(0, si + 1).map(p => ({...p})), {x: jp.x, y: jp.y}]);
+            const pts2 = simplifyOrtho([{x: jp.x, y: jp.y}, ...w.pts.slice(si + 1).map(p => ({...p}))]);
+            wires.splice(wi, 1, {id: uid(), pts: pts1, v:0, i:0}, {id: uid(), pts: pts2, v:0, i:0});
+            changed = true; splitDone = true; break;
+          }
+        }
+        if (splitDone) break;
+      }
+      if (splitDone) break;
+    }
+  }
+  wires = wires.filter(w => w.pts.length >= 2 && (w.pts[0].x !== w.pts[w.pts.length-1].x || w.pts[0].y !== w.pts[w.pts.length-1].y));
+}
+
+// ============================================================================
+// MOTOR DE SIMULACIÓN MNA CON SOPORTE DE LIBRERÍAS Y CORTE REAL DE NODOS ABIERTOS
+// ============================================================================
+function stepSimulation() {
+  const key = (x, y) => `${x},${y}`;
+
+  const adj = new Map();
+  const addNode = (k) => { if (!adj.has(k)) adj.set(k, []); };
+
+  wires.forEach(w => {
+    const k1 = key(w.pts[0].x, w.pts[0].y);
+    const k2 = key(w.pts[w.pts.length - 1].x, w.pts[w.pts.length - 1].y);
+    addNode(k1); addNode(k2);
+    adj.get(k1).push({to: k2, wire: w});
+    adj.get(k2).push({to: k1, wire: w});
+  });
+
+  const allStopKeys = new Set();
+  const pinCountAtCoord = new Map();
+  comps.forEach(c => getPins(c).forEach(p => {
+    const k = key(p.x, p.y);
+    allStopKeys.add(k);
+    pinCountAtCoord.set(k, (pinCountAtCoord.get(k) || 0) + 1);
+  }));
+  wires.forEach(w => {
+    allStopKeys.add(key(w.pts[0].x, w.pts[0].y));
+    allStopKeys.add(key(w.pts[w.pts.length-1].x, w.pts[w.pts.length-1].y));
+  });
+
+  const coordToNode = new Map();
+  let nodeCount = 0;
+
+  const gndQueue = [];
+  comps.filter(c => c.type === 'gnd').forEach(c => {
+    const p = getPins(c)[0];
+    const k = key(p.x, p.y);
+    coordToNode.set(k, 0);
+    gndQueue.push(k);
+  });
+
+  while (gndQueue.length > 0) {
+    const curr = gndQueue.shift();
+    (adj.get(curr) || []).forEach(edge => {
+      if (!coordToNode.has(edge.to)) {
+        coordToNode.set(edge.to, 0);
+        gndQueue.push(edge.to);
+      }
+    });
+  }
+
+  const nodePinTotal = new Map();
+  nodePinTotal.set(0, 999);
+
+  allStopKeys.forEach(k => {
+    if (!coordToNode.has(k)) {
+      nodeCount++;
+      const nIdx = nodeCount;
+      const q = [k];
+      coordToNode.set(k, nIdx);
+      let pinsInSupernode = 0;
+      while (q.length > 0) {
+        const curr = q.shift();
+        pinsInSupernode += (pinCountAtCoord.get(curr) || 0);
+        (adj.get(curr) || []).forEach(edge => {
+          if (!coordToNode.has(edge.to)) {
+            coordToNode.set(edge.to, nIdx);
+            q.push(edge.to);
+          }
+        });
+      }
+      nodePinTotal.set(nIdx, pinsInSupernode);
+    }
+  });
+
+  const getNode = (x, y) => {
+    const n = coordToNode.get(key(x, y));
+    return n !== undefined ? n : 0;
+  };
+
+  const vSources = comps.filter(c => c.type === 'dc' || c.type === 'ac');
+  const M = nodeCount + vSources.length;
+  if (M === 0) return;
+
+  let V = new Array(M + 1).fill(0);
+  comps.forEach(c => {
+    getPins(c).forEach((p, idx) => {
+      const n = getNode(p.x, p.y);
+      if (n > 0 && c.lastV && c.lastV[idx] !== undefined && !isNaN(c.lastV[idx])) {
+        V[n] = c.lastV[idx];
+      }
+    });
+  });
+
+  const IS = 1e-12, VT = 0.02585, BF = 100, BR = 1;
+  const ALPHA_F = BF / (BF + 1), ALPHA_R = BR / (BR + 1);
+
+  const limitV = (vd) => vd > 0.85 ? 0.85 + Math.log(1 + (vd - 0.85)) * 0.02 : (vd < -20 ? -20 : vd);
+  const diodeEval = (vd) => {
+    const v = limitV(vd);
+    const ev = Math.exp(v / VT);
+    return { i: IS * (ev - 1), g: (IS / VT) * ev, v };
+  };
+
+  for (let iter = 0; iter < 40; iter++) {
+    const A = Array.from({length: M}, () => new Array(M).fill(0));
+    const Z = new Array(M).fill(0);
+
+    for (let i = 0; i < nodeCount; i++) A[i][i] += 1e-12;
+
+    const stampG = (n1, n2, g) => {
+      if (n1 > 0) A[n1-1][n1-1] += g;
+      if (n2 > 0) A[n2-1][n2-1] += g;
+      if (n1 > 0 && n2 > 0) { A[n1-1][n2-1] -= g; A[n2-1][n1-1] -= g; }
+    };
+    const stampI = (n1, n2, iVal) => {
+      if (n1 > 0) Z[n1-1] -= iVal;
+      if (n2 > 0) Z[n2-1] += iVal;
+    };
+
+    comps.forEach(c => {
+      const pins = getPins(c);
+      const nPins = pins.map(p => getNode(p.x, p.y));
+      const vPins = nPins.map(n => n > 0 ? V[n] : 0);
+
+      // Si es un componente de una librería externa
+      if (COMPONENT_LIBRARY.has(c.type)) {
+        const def = COMPONENT_LIBRARY.get(c.type);
+        const isOpen = nPins.some(n => (nodePinTotal.get(n) || 0) <= 1);
+        if (!isOpen && def.stamp) {
+          def.stamp(c, {nPins, vPins, stampG, stampI, DT, simTime, diodeEval});
+        }
+        return;
+      }
+
+      if (c.type === 'res' || c.type === 'vres') {
+        stampG(nPins[0], nPins[1], 1 / Math.max(1e-3, c.r));
+      } else if (c.type === 'cap' || c.type === 'vcap') {
+        const gEq = c.c / DT;
+        const vPrev = c.vCap || 0;
+        stampG(nPins[0], nPins[1], gEq);
+        stampI(nPins[0], nPins[1], -gEq * vPrev);
+      } else if (c.type === 'diode') {
+        const vd = vPins[0] - vPins[1];
+        const d = diodeEval(vd);
+        stampG(nPins[0], nPins[1], d.g);
+        stampI(nPins[0], nPins[1], d.i - d.g * vd);
+      } else if (c.type === 'npn' || c.type === 'pnp') {
+        const [nB, nC, nE] = nPins;
+        const baseOpen = (nodePinTotal.get(nB) || 0) <= 1;
+        const colOpen  = (nodePinTotal.get(nC) || 0) <= 1;
+        const emiOpen  = (nodePinTotal.get(nE) || 0) <= 1;
+        if (baseOpen || (colOpen && emiOpen)) {
+          stampG(nB, nE, 1e-12);
+          stampG(nC, nE, 1e-12);
+          return;
+        }
+
+        const [vB, vC, vE] = vPins;
+        const pol = c.type === 'npn' ? 1 : -1;
+        const vbe = pol * (vB - vE);
+        const vbc = pol * (vB - vC);
+        const dBE = diodeEval(vbe);
+        const dBC = diodeEval(vbc);
+
+        stampG(nB, nE, dBE.g * (1 - ALPHA_F));
+        stampI(nB, nE, pol * (1 - ALPHA_F) * (dBE.i - dBE.g * vbe));
+
+        stampG(nB, nC, dBC.g * (1 - ALPHA_R));
+        stampI(nB, nC, pol * (1 - ALPHA_R) * (dBC.i - dBC.g * vbc));
+
+        if (nC > 0) { if (nB > 0) A[nC-1][nB-1] += ALPHA_F * dBE.g; if (nE > 0) A[nC-1][nE-1] -= ALPHA_F * dBE.g; }
+        if (nE > 0) { if (nB > 0) A[nE-1][nB-1] -= ALPHA_F * dBE.g; if (nE > 0) A[nE-1][nE-1] += ALPHA_F * dBE.g; }
+        stampI(nC, nE, pol * ALPHA_F * (dBE.i - dBE.g * vbe));
+
+        if (nE > 0) { if (nB > 0) A[nE-1][nB-1] += ALPHA_R * dBC.g; if (nC > 0) A[nE-1][nC-1] -= ALPHA_R * dBC.g; }
+        if (nC > 0) { if (nB > 0) A[nC-1][nB-1] -= ALPHA_R * dBC.g; if (nC > 0) A[nC-1][nC-1] += ALPHA_R * dBC.g; }
+        stampI(nE, nC, pol * ALPHA_R * (dBC.i - dBC.g * vbc));
+      }
+    });
+
+    vSources.forEach((c, idx) => {
+      const row = nodeCount + idx;
+      const pins = getPins(c);
+      const nNeg = getNode(pins[0].x, pins[0].y);
+      const nPos = getNode(pins[1].x, pins[1].y);
+      const vSrc = c.type === 'dc' ? c.v : c.v * Math.sin(2 * Math.PI * c.freq * simTime);
+      if (nPos > 0) { A[row][nPos-1] = 1; A[nPos-1][row] = 1; }
+      if (nNeg > 0) { A[row][nNeg-1] = -1; A[nNeg-1][row] = -1; }
+      Z[row] = vSrc;
+    });
+
+    const sol = solveLinear(A, Z);
+    if (!sol) break;
+    let maxDiff = 0;
+    for (let i = 0; i < M; i++) {
+      const nextVal = isNaN(sol[i]) ? 0 : sol[i];
+      const delta = nextVal - V[i+1];
+      maxDiff = Math.max(maxDiff, Math.abs(delta));
+      V[i+1] += Math.abs(delta) > 0.3 ? delta * 0.5 : delta;
+    }
+    if (maxDiff < 1e-6) break;
+  }
+
+  const pinInjection = new Map();
+  const addInj = (k, val) => pinInjection.set(k, (pinInjection.get(k) || 0) + val);
+
+  comps.forEach(c => {
+    const pins = getPins(c);
+    const nPins = pins.map(p => getNode(p.x, p.y));
+    const vPins = nPins.map(n => n > 0 ? V[n] : 0);
+    c.lastV = vPins;
+
+    // Componente de librería externa
+    if (COMPONENT_LIBRARY.has(c.type)) {
+      const def = COMPONENT_LIBRARY.get(c.type);
+      const isOpen = nPins.some(n => (nodePinTotal.get(n) || 0) <= 1);
+      if (def.updateState) {
+        def.updateState(c, {vPins, isOpen, DT, diodeEval, addInj: (pinIdx, currentOutOfComp) => {
+          addInj(key(pins[pinIdx].x, pins[pinIdx].y), currentOutOfComp);
+        }});
+      }
+      return;
+    }
+
+    const twoPinOpen = pins.length === 2 && ((nodePinTotal.get(nPins[0]) || 0) <= 1 || (nodePinTotal.get(nPins[1]) || 0) <= 1);
+
+    if (c.type === 'res' || c.type === 'vres') {
+      c.dv = twoPinOpen ? 0 : (vPins[0] - vPins[1]);
+      c.i = twoPinOpen ? 0 : c.dv / Math.max(1e-3, c.r);
+      c.p = Math.abs(c.dv * c.i);
+      addInj(key(pins[0].x, pins[0].y), -c.i);
+      addInj(key(pins[1].x, pins[1].y), +c.i);
+    } else if (c.type === 'cap' || c.type === 'vcap') {
+      const dv = twoPinOpen ? (c.vCap || 0) : (vPins[0] - vPins[1]);
+      c.i = twoPinOpen ? 0 : (c.c / DT) * (dv - (c.vCap || 0));
+      c.vCap = dv;
+      c.dv = dv;
+      c.p = Math.abs(dv * c.i);
+      addInj(key(pins[0].x, pins[0].y), -c.i);
+      addInj(key(pins[1].x, pins[1].y), +c.i);
+    } else if (c.type === 'diode') {
+      const dv = twoPinOpen ? 0 : (vPins[0] - vPins[1]);
+      c.dv = dv;
+      c.i = twoPinOpen ? 0 : diodeEval(dv).i;
+      c.p = Math.abs(dv * c.i);
+      addInj(key(pins[0].x, pins[0].y), -c.i);
+      addInj(key(pins[1].x, pins[1].y), +c.i);
+    } else if (c.type === 'npn' || c.type === 'pnp') {
+      const baseOpen = (nodePinTotal.get(nPins[0]) || 0) <= 1;
+      const colOpen  = (nodePinTotal.get(nPins[1]) || 0) <= 1;
+      const emiOpen  = (nodePinTotal.get(nPins[2]) || 0) <= 1;
+      const [vB, vC, vE] = vPins;
+
+      if (baseOpen || colOpen || emiOpen) {
+        c.iB = 0; c.iC = 0; c.iE = 0;
+        c.vCE = vC - vE; c.vBE = 0; c.vCB = vC - vE;
+        c.p = 0;
+      } else {
+        const pol = c.type === 'npn' ? 1 : -1;
+        const dBE = diodeEval(pol * (vB - vE));
+        const dBC = diodeEval(pol * (vB - vC));
+        const iB = pol * ((1 - ALPHA_F) * dBE.i + (1 - ALPHA_R) * dBC.i);
+        const iC = pol * (ALPHA_F * dBE.i - dBC.i);
+        const iE = -(iB + iC);
+        c.iB = iB; c.iC = iC; c.iE = iE;
+        c.vCE = vC - vE; c.vBE = vB - vE; c.vCB = vC - vB;
+        c.p = Math.abs(vC * iC + vB * iB + vE * iE);
+        addInj(key(pins[0].x, pins[0].y), -iB);
+        addInj(key(pins[1].x, pins[1].y), -iC);
+        addInj(key(pins[2].x, pins[2].y), -iE);
+      }
+    }
+  });
+
+  vSources.forEach((c, idx) => {
+    const pins = getPins(c);
+    const nPins = pins.map(p => getNode(p.x, p.y));
+    const twoPinOpen = (nodePinTotal.get(nPins[0]) || 0) <= 1 || (nodePinTotal.get(nPins[1]) || 0) <= 1;
+    const vPins = c.lastV;
+    const iMNA = twoPinOpen ? 0 : (V[nodeCount + 1 + idx] || 0);
+    c.dv = vPins[1] - vPins[0];
+    c.i = -iMNA;
+    c.p = Math.abs(c.dv * c.i);
+    addInj(key(pins[0].x, pins[0].y), -c.i);
+    addInj(key(pins[1].x, pins[1].y), +c.i);
+  });
+
+  wires.forEach(w => {
+    const n = getNode(w.pts[0].x, w.pts[0].y);
+    w.v = n > 0 ? V[n] : 0;
+    w.i = 0;
+  });
+
+  const nodeWires = new Map();
+  wires.forEach(w => {
+    const n = getNode(w.pts[0].x, w.pts[0].y);
+    if (!nodeWires.has(n)) nodeWires.set(n, []);
+    nodeWires.get(n).push(w);
+  });
+
+  nodeWires.forEach((wList, nIdx) => {
+    if ((nodePinTotal.get(nIdx) || 0) <= 1) return;
+    const subVerts = [];
+    const vMap = new Map();
+    const getVIdx = (k) => {
+      if (!vMap.has(k)) { vMap.set(k, subVerts.length); subVerts.push(k); }
+      return vMap.get(k);
+    };
+    wList.forEach(w => {
+      getVIdx(key(w.pts[0].x, w.pts[0].y));
+      getVIdx(key(w.pts[w.pts.length-1].x, w.pts[w.pts.length-1].y));
+    });
+    const K = subVerts.length;
+    if (K <= 1) return;
+
+    let refIdx = K - 1;
+    if (nIdx === 0) {
+      comps.filter(c => c.type === 'gnd').forEach(g => {
+        const gk = key(getPins(g)[0].x, getPins(g)[0].y);
+        if (vMap.has(gk)) refIdx = vMap.get(gk);
+      });
+    }
+
+    const L = Array.from({length: K}, () => new Array(K).fill(0));
+    const B = new Array(K).fill(0);
+    subVerts.forEach((vk, i) => { B[i] = pinInjection.get(vk) || 0; });
+
+    wList.forEach(w => {
+      const u = vMap.get(key(w.pts[0].x, w.pts[0].y));
+      const v = vMap.get(key(w.pts[w.pts.length-1].x, w.pts[w.pts.length-1].y));
+      if (u !== v) {
+        L[u][u] += 1; L[v][v] += 1;
+        L[u][v] -= 1; L[v][u] -= 1;
+      }
+    });
+
+    for (let j = 0; j < K; j++) L[refIdx][j] = 0;
+    L[refIdx][refIdx] = 1;
+    B[refIdx] = 0;
+
+    const phi = solveLinear(L, B);
+    if (phi) {
+      wList.forEach(w => {
+        const u = vMap.get(key(w.pts[0].x, w.pts[0].y));
+        const v = vMap.get(key(w.pts[w.pts.length-1].x, w.pts[w.pts.length-1].y));
+        w.i = phi[u] - phi[v];
+      });
+    }
+  });
+
+  simTime += DT;
+}
+
+function solveLinear(A, B) {
+  const n = B.length;
+  for (let i = 0; i < n; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++) {
+      if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+    }
+    if (Math.abs(A[maxRow][i]) < 1e-18) continue;
+    [A[i], A[maxRow]] = [A[maxRow], A[i]];
+    [B[i], B[maxRow]] = [B[maxRow], B[i]];
+    for (let k = i + 1; k < n; k++) {
+      const f = A[k][i] / A[i][i];
+      B[k] -= f * B[i];
+      for (let j = i; j < n; j++) A[k][j] -= f * A[i][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(A[i][i]) < 1e-18) continue;
+    let s = B[i];
+    for (let j = i + 1; j < n; j++) s -= A[i][j] * x[j];
+    x[i] = s / A[i][i];
+  }
+  return x;
+}
+
+// ============================================================================
+// DIBUJO EN CANVAS
+// ============================================================================
+let animOffset = 0;
+
+function drawParticlesOnPath(pts, currentVal) {
+  if (!showCurrent || Math.abs(currentVal || 0) <= 1e-6) return;
+  const speed = Math.min(3.5, Math.max(0.4, Math.log10(Math.abs(currentVal) * 1e4 + 1) * 0.9));
+  const dir = currentVal >= 0 ? 1 : -1;
+  const spacing = 16;
+  const shift = ((animOffset * speed * dir) % spacing + spacing) % spacing;
+
+  ctx.save();
+  ctx.fillStyle = '#fde047';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 2) continue;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    for (let d = shift; d < len; d += spacing) {
+      ctx.beginPath();
+      ctx.arc(a.x + ux * d, a.y + uy * d, 2.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  ctx.fillStyle = '#1e293b';
+  for (let x = 0; x < cv.width; x += GRID) {
+    for (let y = 0; y < cv.height; y += GRID) {
+      ctx.fillRect(x - 1, y - 1, 2, 2);
+    }
+  }
+
+  const connCount = new Map();
+  const incConn = (x, y) => {
+    const k = `${x},${y}`;
+    connCount.set(k, (connCount.get(k) || 0) + 1);
+  };
+  wires.forEach(w => {
+    incConn(w.pts[0].x, w.pts[0].y);
+    incConn(w.pts[w.pts.length - 1].x, w.pts[w.pts.length - 1].y);
+  });
+  comps.forEach(c => getPins(c).forEach(p => incConn(p.x, p.y)));
+
+  wires.forEach(w => {
+    const isSel = selected === w;
+    const isHov = hovered === w;
+    ctx.save();
+    ctx.lineWidth = isSel || isHov ? 4 : 2.6;
+    ctx.strokeStyle = isSel ? '#38bdf8' : (isHov ? '#7dd3fc' : '#94a3b8');
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    drawWirePath(w.pts);
+    ctx.stroke();
+
+    drawParticlesOnPath(w.pts, w.i);
+
+    if (isSel) {
+      for (let i = 0; i < w.pts.length - 1; i++) {
+        const mx = (w.pts[i].x + w.pts[i+1].x) / 2;
+        const my = (w.pts[i].y + w.pts[i+1].y) / 2;
+        ctx.fillStyle = '#0284c7';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(mx, my, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  });
+
+  if (drawingWire) {
+    const pts = makeOrthoPoints(drawingWire.x1, drawingWire.y1, drawingWire.x2, drawingWire.y2, drawingWire.flip);
+    ctx.save();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 4]);
+    drawWirePath(pts);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  comps.forEach(c => drawComponent(c));
+
+  connCount.forEach((count, k) => {
+    if (count >= 2) {
+      const [x, y] = k.split(',').map(Number);
+      ctx.fillStyle = count >= 3 ? '#22c55e' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(x, y, count >= 3 ? 4.5 : 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
+function drawWirePath(pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if (!curvedWires || pts.length < 3) {
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  } else {
+    for (let i = 1; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      const r = 14;
+      const d1 = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      const d2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const rc = Math.min(r, d1 / 2, d2 / 2);
+      ctx.arcTo(p1.x, p1.y, p2.x, p2.y, rc);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  }
+}
+
+function drawComponent(c) {
+  const isSel = selected === c;
+  const isHov = hovered === c;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate((c.rot || 0) * Math.PI / 2);
+
+  ctx.strokeStyle = isSel ? '#38bdf8' : (isHov ? '#7dd3fc' : '#f8fafc');
+  ctx.lineWidth = 2.2;
+  ctx.fillStyle = '#0f172a';
+
+  let customLabel = null;
+
+  // Si pertenece a una librería externa
+  if (COMPONENT_LIBRARY.has(c.type)) {
+    const def = COMPONENT_LIBRARY.get(c.type);
+    if (def.draw) def.draw(ctx, c, {isSel, isHov, drawParticlesOnPath, formatUnit});
+    if (def.label) customLabel = def.label(c, formatUnit);
+  } else if (c.type === 'res' || c.type === 'vres') {
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-22, 0);
+    ctx.strokeRect(-22, -9, 44, 18);
+    ctx.moveTo(22, 0); ctx.lineTo(40, 0);
+    ctx.stroke();
+    if (c.type === 'vres') {
+      ctx.strokeStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(-16, 15); ctx.lineTo(16, -15);
+      ctx.moveTo(10, -15); ctx.lineTo(16, -15); ctx.lineTo(16, -9);
+      ctx.stroke();
+    }
+    drawParticlesOnPath([{x:-40, y:0}, {x:40, y:0}], c.i);
+  } else if (c.type === 'cap' || c.type === 'vcap') {
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-5, 0);
+    ctx.moveTo(-5, -14); ctx.lineTo(-5, 14);
+    ctx.moveTo(5, -14); ctx.lineTo(5, 14);
+    ctx.moveTo(5, 0); ctx.lineTo(40, 0);
+    ctx.stroke();
+    if (c.type === 'vcap') {
+      ctx.strokeStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(-14, 14); ctx.lineTo(14, -14);
+      ctx.moveTo(8, -14); ctx.lineTo(14, -14); ctx.lineTo(14, -8);
+      ctx.stroke();
+    }
+    drawParticlesOnPath([{x:-40, y:0}, {x:-5, y:0}], c.i);
+    drawParticlesOnPath([{x:5, y:0}, {x:40, y:0}], c.i);
+  } else if (c.type === 'dc') {
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-5, 0);
+    ctx.moveTo(-5, -9); ctx.lineTo(-5, 9);
+    ctx.moveTo(5, -16); ctx.lineTo(5, 16);
+    ctx.moveTo(5, 0); ctx.lineTo(40, 0);
+    ctx.stroke();
+    ctx.fillStyle = '#22c55e'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('+', 10, -8);
+    drawParticlesOnPath([{x:-40, y:0}, {x:40, y:0}], c.i);
+  } else if (c.type === 'ac') {
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-16, 0);
+    ctx.moveTo(16, 0); ctx.lineTo(40, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-9, 0);
+    ctx.bezierCurveTo(-4, -9, 0, -9, 0, 0);
+    ctx.bezierCurveTo(0, 9, 4, 9, 9, 0);
+    ctx.stroke();
+    drawParticlesOnPath([{x:-40, y:0}, {x:40, y:0}], c.i);
+  } else if (c.type === 'gnd') {
+    ctx.beginPath();
+    ctx.moveTo(0, -20); ctx.lineTo(0, 0);
+    ctx.moveTo(-14, 0); ctx.lineTo(14, 0);
+    ctx.moveTo(-9, 5); ctx.lineTo(9, 5);
+    ctx.moveTo(-4, 10); ctx.lineTo(4, 10);
+    ctx.stroke();
+  } else if (c.type === 'diode') {
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-10, 0);
+    ctx.moveTo(10, 0); ctx.lineTo(40, 0);
+    ctx.moveTo(-10, -11); ctx.lineTo(-10, 11); ctx.lineTo(10, 0); ctx.closePath();
+    ctx.moveTo(10, -11); ctx.lineTo(10, 11);
+    ctx.stroke();
+    drawParticlesOnPath([{x:-40, y:0}, {x:40, y:0}], c.i);
+  } else if (c.type === 'npn' || c.type === 'pnp') {
+    ctx.beginPath();
+    ctx.arc(4, 0, 22, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-40, 0); ctx.lineTo(-6, 0);
+    ctx.moveTo(-6, -13); ctx.lineTo(-6, 13);
+    ctx.moveTo(-6, -6); ctx.lineTo(20, -22); ctx.lineTo(20, -40);
+    ctx.moveTo(-6, 6); ctx.lineTo(20, 22); ctx.lineTo(20, 40);
+    ctx.stroke();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    if (c.type === 'npn') {
+      ctx.moveTo(16, 19.5); ctx.lineTo(8, 19); ctx.lineTo(12, 12);
+    } else {
+      ctx.moveTo(0, 9.5); ctx.lineTo(8, 10); ctx.lineTo(4, 17);
+    }
+    ctx.closePath(); ctx.fill();
+
+    drawParticlesOnPath([{x:-40, y:0}, {x:-6, y:0}], c.iB);
+    drawParticlesOnPath([{x:20, y:-40}, {x:20, y:-22}, {x:-6, y:-6}], c.iC);
+    drawParticlesOnPath([{x:20, y:40}, {x:20, y:22}, {x:-6, y:6}], c.iE);
+  }
+  ctx.restore();
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  let lbl = customLabel || '';
+  if (!customLabel) {
+    if (c.type === 'res' || c.type === 'vres') lbl = `${formatUnit(c.r, 'Ω')} (${formatUnit(Math.abs(c.i||0), 'A')})`;
+    else if (c.type === 'cap' || c.type === 'vcap') lbl = `${formatUnit(c.c, 'F')} (${formatUnit(Math.abs(c.i||0), 'A')})`;
+    else if (c.type === 'dc') lbl = `${c.v}V (${formatUnit(Math.abs(c.i||0), 'A')})`;
+    else if (c.type === 'ac') lbl = `${c.v}V/${c.freq}Hz`;
+    else if (c.type === 'diode') lbl = `D (${formatUnit(Math.abs(c.i||0), 'A')})`;
+    else if (c.type === 'npn' || c.type === 'pnp') lbl = `${c.type.toUpperCase()} (Ic:${formatUnit(Math.abs(c.iC||0), 'A')})`;
+  }
+  if (lbl) ctx.fillText(lbl, c.x, c.y - 26);
+
+  getPins(c).forEach(p => {
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// ============================================================================
+// INTERACCIÓN CON EL RATÓN
+// ============================================================================
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+}
+
+function toggleSim() {
+  simRunning = !simRunning;
+  const b = document.getElementById('btnRun');
+  b.textContent = simRunning ? '▶ Simular' : '⏸ Pausado';
+  b.classList.toggle('active', simRunning);
+}
+
+function toggleCurrentAnim() {
+  showCurrent = !showCurrent;
+  const b = document.getElementById('btnCurr');
+  b.textContent = showCurrent ? '⚡ Corriente: ON' : '⚡ Corriente: OFF';
+  b.classList.toggle('active', showCurrent);
+}
+
+function toggleWireStyle() {
+  curvedWires = !curvedWires;
+  const b = document.getElementById('btnCurve');
+  b.textContent = curvedWires ? '〰 Cables: Curvos' : '📐 Cables: Rectos';
+  b.classList.toggle('active', curvedWires);
+}
+
+function moveWireEndOrthogonally(w, endIndex, nx, ny) {
+  if (w.pts.length < 2) return;
+  if (endIndex === 0) {
+    const p1 = w.pts[w.pts.length - 1];
+    if (w.pts.length <= 3) {
+      w.pts = makeOrthoPoints(nx, ny, p1.x, p1.y, false);
+    } else {
+      const next = w.pts[1], next2 = w.pts[2];
+      if (next.x === next2.x) next.y = ny;
+      else next.x = nx;
+      w.pts[0] = {x: nx, y: ny};
+    }
+  } else {
+    const p0 = w.pts[0];
+    if (w.pts.length <= 3) {
+      w.pts = makeOrthoPoints(p0.x, p0.y, nx, ny, false);
+    } else {
+      const prev = w.pts[w.pts.length - 2], prev2 = w.pts[w.pts.length - 3];
+      if (prev.x === prev2.x) prev.y = ny;
+      else prev.x = nx;
+      w.pts[w.pts.length - 1] = {x: nx, y: ny};
+    }
+  }
+}
+
+function rotateSelected() {
+  if (selected && selected.type) {
+    const oldPins = getPins(selected);
+    const links = [];
+    oldPins.forEach((p, pIdx) => {
+      wires.forEach(w => {
+        if (w.pts[0].x === p.x && w.pts[0].y === p.y) links.push({w, end: 0, pIdx});
+        else if (w.pts[w.pts.length-1].x === p.x && w.pts[w.pts.length-1].y === p.y) links.push({w, end: 1, pIdx});
+      });
+    });
+
+    selected.rot = ((selected.rot || 0) + 1) % 4;
+    const newPins = getPins(selected);
+    links.forEach(lk => {
+      const np = newPins[lk.pIdx];
+      moveWireEndOrthogonally(lk.w, lk.end, np.x, np.y);
+      lk.w.pts = simplifyOrtho(lk.w.pts);
+    });
+    splitWiresAtJunctions();
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') rotateSelected();
+  if (e.code === 'Space' && drawingWire) {
+    e.preventDefault();
+    drawingWire.flip = !drawingWire.flip;
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selected && document.activeElement.tagName !== 'INPUT') {
+    deleteElement(selected);
+  }
+});
+
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+}
+
+function findAt(mx, my) {
+  for (const c of comps) {
+    if (Math.hypot(mx - c.x, my - c.y) < 26) return c;
+  }
+  for (const w of wires) {
+    for (let i = 0; i < w.pts.length - 1; i++) {
+      if (distToSegment(mx, my, w.pts[i].x, w.pts[i].y, w.pts[i+1].x, w.pts[i+1].y) < 7) return w;
+    }
+  }
+  return null;
+}
+
+cv.addEventListener('mousedown', e => {
+  const rect = cv.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const sx = snap(mx), sy = snap(my);
+
+  if (selected && selected.pts) {
+    for (let i = 0; i < selected.pts.length - 1; i++) {
+      const hx = (selected.pts[i].x + selected.pts[i+1].x) / 2;
+      const hy = (selected.pts[i].y + selected.pts[i+1].y) / 2;
+      if (Math.hypot(mx - hx, my - hy) < 9) {
+        draggingSegment = {wire: selected, idx: i};
+        return;
+      }
+    }
+  }
+
+  for (const c of comps) {
+    for (const p of getPins(c)) {
+      if (Math.hypot(mx - p.x, my - p.y) < 9 && tool !== 'delete') {
+        drawingWire = {x1: p.x, y1: p.y, x2: sx, y2: sy, flip: false};
+        return;
+      }
+    }
+  }
+
+  if (tool === 'wire') {
+    drawingWire = {x1: sx, y1: sy, x2: sx, y2: sy, flip: false};
+    return;
+  }
+
+  const hit = findAt(mx, my);
+  if (tool === 'delete') {
+    if (hit) deleteElement(hit);
+    return;
+  }
+
+  if (tool === 'select') {
+    selected = hit;
+    updatePropPanel();
+    if (hit && hit.type) {
+      splitWiresAtJunctions();
+      draggingComp = hit;
+      dragOffset = {x: sx - hit.x, y: sy - hit.y};
+      attachedWireEnds = [];
+      const pins = getPins(hit);
+      pins.forEach((p, pinIdx) => {
+        wires.forEach(w => {
+          if (w.pts[0].x === p.x && w.pts[0].y === p.y) {
+            attachedWireEnds.push({wire: w, end: 0, pinIdx});
+          } else if (w.pts[w.pts.length - 1].x === p.x && w.pts[w.pts.length - 1].y === p.y) {
+            attachedWireEnds.push({wire: w, end: 1, pinIdx});
+          }
+        });
+      });
+    }
+    return;
+  }
+
+  const newComp = {id: uid(), type: tool, x: sx, y: sy, rot: 0};
+  if (COMPONENT_LIBRARY.has(tool)) {
+    const def = COMPONENT_LIBRARY.get(tool);
+    if (def.defaults) Object.assign(newComp, JSON.parse(JSON.stringify(def.defaults)));
+  } else {
+    if (tool === 'res' || tool === 'vres') newComp.r = 1000;
+    if (tool === 'cap' || tool === 'vcap') newComp.c = 10e-6;
+    if (tool === 'dc') newComp.v = 9;
+    if (tool === 'ac') { newComp.v = 12; newComp.freq = 50; }
+  }
+  comps.push(newComp);
+  splitWiresAtJunctions();
+  selected = newComp;
+  updatePropPanel();
+  setTool('select');
+});
+
+cv.addEventListener('mousemove', e => {
+  const rect = cv.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const sx = snap(mx), sy = snap(my);
+
+  if (drawingWire) {
+    drawingWire.x2 = sx;
+    drawingWire.y2 = sy;
+    return;
+  }
+
+  if (draggingComp) {
+    draggingComp.x = sx - dragOffset.x;
+    draggingComp.y = sy - dragOffset.y;
+    const newPins = getPins(draggingComp);
+    attachedWireEnds.forEach(att => {
+      const np = newPins[att.pinIdx];
+      moveWireEndOrthogonally(att.wire, att.end, np.x, np.y);
+    });
+    return;
+  }
+
+  if (draggingSegment) {
+    const w = draggingSegment.wire;
+    let i = draggingSegment.idx;
+    const p1 = w.pts[i], p2 = w.pts[i + 1];
+    const isHoriz = p1.y === p2.y;
+
+    if (w.pts.length === 2) {
+      w.pts = [{x: p1.x, y: p1.y}, {x: p1.x, y: p1.y}, {x: p2.x, y: p2.y}, {x: p2.x, y: p2.y}];
+      i = 1; draggingSegment.idx = 1;
+    } else if (i === 0) {
+      w.pts.unshift({x: p1.x, y: p1.y});
+      i = 1; draggingSegment.idx = 1;
+    } else if (i === w.pts.length - 2) {
+      w.pts.push({x: p2.x, y: p2.y});
+    }
+
+    if (isHoriz) {
+      w.pts[i].y = sy; w.pts[i + 1].y = sy;
+    } else {
+      w.pts[i].x = sx; w.pts[i + 1].x = sx;
+    }
+    return;
+  }
+
+  hovered = findAt(mx, my);
+  updateTooltip(e.clientX, e.clientY, hovered);
+});
+
+window.addEventListener('mouseup', () => {
+  if (drawingWire) {
+    if (drawingWire.x1 !== drawingWire.x2 || drawingWire.y1 !== drawingWire.y2) {
+      const pts = makeOrthoPoints(drawingWire.x1, drawingWire.y1, drawingWire.x2, drawingWire.y2, drawingWire.flip);
+      const w = {id: uid(), pts: simplifyOrtho(pts), v: 0, i: 0};
+      wires.push(w);
+      splitWiresAtJunctions();
+      selected = w;
+      updatePropPanel();
+    }
+    drawingWire = null;
+  }
+  if (draggingComp) {
+    attachedWireEnds.forEach(att => {
+      att.wire.pts = simplifyOrtho(att.wire.pts);
+    });
+    splitWiresAtJunctions();
+    draggingComp = null;
+    attachedWireEnds = [];
+  }
+  if (draggingSegment) {
+    draggingSegment.wire.pts = simplifyOrtho(draggingSegment.wire.pts);
+    splitWiresAtJunctions();
+    draggingSegment = null;
+  }
+});
+
+function deleteElement(el) {
+  if (el.type) {
+    const pinCoords = getPins(el);
+    wires = wires.filter(w => {
+      const pStart = w.pts[0];
+      const pEnd = w.pts[w.pts.length - 1];
+      const touchesPin = pinCoords.some(p =>
+        (p.x === pStart.x && p.y === pStart.y) || (p.x === pEnd.x && p.y === pEnd.y)
+      );
+      return !touchesPin;
+    });
+    comps = comps.filter(c => c !== el);
+  } else {
+    wires = wires.filter(w => w !== el);
+  }
+  if (selected === el) { selected = null; updatePropPanel(); }
+}
+
+// ============================================================================
+// TOOLTIP Y PANEL DE PROPIEDADES (CON SOPORTE PARA LIBRERÍAS EXTERNAS)
+// ============================================================================
+function updateTooltip(cx, cy, item) {
+  if (!item) {
+    tooltip.style.display = 'none';
+    return;
+  }
+  tooltip.style.display = 'block';
+  tooltip.style.left = Math.min(window.innerWidth - 250, cx + 16) + 'px';
+  tooltip.style.top = Math.min(window.innerHeight - 200, cy + 16) + 'px';
+
+  let html = '';
+  if (item.pts) {
+    html = `<h4>📏 Cable Conductor</h4>
+      <div class="kv"><span>Potencial (V):</span><span>${formatUnit(item.v || 0, 'V')}</span></div>
+      <div class="kv"><span>Intensidad (I):</span><span>${formatUnit(Math.abs(item.i || 0), 'A')}</span></div>`;
+  } else if (COMPONENT_LIBRARY.has(item.type)) {
+    const def = COMPONENT_LIBRARY.get(item.type);
+    if (def.tooltip) html = def.tooltip(item, formatUnit);
+  } else if (item.type === 'res' || item.type === 'vres') {
+    html = `<h4>🗲 Resistencia ${item.type === 'vres' ? 'Variable' : ''}</h4>
+      <div class="kv"><span>Valor (R):</span><span>${formatUnit(item.r, 'Ω')}</span></div>
+      <div class="kv"><span>Voltaje (|ΔV|):</span><span>${formatUnit(Math.abs(item.dv || 0), 'V')}</span></div>
+      <div class="kv"><span>Intensidad (I):</span><span>${formatUnit(Math.abs(item.i || 0), 'A')}</span></div>
+      <div class="kv"><span>Potencia (P):</span><span>${formatUnit(item.p || 0, 'W')}</span></div>`;
+  } else if (item.type === 'cap' || item.type === 'vcap') {
+    const q = Math.abs((item.c || 0) * (item.dv || 0));
+    html = `<h4>⏸ Condensador ${item.type === 'vcap' ? 'Variable' : ''}</h4>
+      <div class="kv"><span>Capacidad (C):</span><span>${formatUnit(item.c, 'F')}</span></div>
+      <div class="kv"><span>Voltaje (|ΔV|):</span><span>${formatUnit(Math.abs(item.dv || 0), 'V')}</span></div>
+      <div class="kv"><span>Corriente (I):</span><span>${formatUnit(Math.abs(item.i || 0), 'A')}</span></div>
+      <div class="kv"><span>Carga (Q):</span><span>${formatUnit(q, 'C')}</span></div>`;
+  } else if (item.type === 'diode') {
+    const estado = (item.dv || 0) > 0.5 ? 'Conduciendo' : 'En Corte';
+    html = `<h4>▶| Diodo</h4>
+      <div class="kv"><span>Estado:</span><span>${estado}</span></div>
+      <div class="kv"><span>Voltaje (V_AK):</span><span>${formatUnit(item.dv || 0, 'V')}</span></div>
+      <div class="kv"><span>Corriente (I):</span><span>${formatUnit(Math.abs(item.i || 0), 'A')}</span></div>
+      <div class="kv"><span>Potencia (P):</span><span>${formatUnit(item.p || 0, 'W')}</span></div>`;
+  } else if (item.type === 'npn' || item.type === 'pnp') {
+    html = `<h4>Transistor BJT (${item.type.toUpperCase()})</h4>
+      <div class="kv"><span>I Colector (I_C):</span><span>${formatUnit(Math.abs(item.iC || 0), 'A')}</span></div>
+      <div class="kv"><span>I Base (I_B):</span><span>${formatUnit(Math.abs(item.iB || 0), 'A')}</span></div>
+      <div class="kv"><span>I Emisor (I_E):</span><span>${formatUnit(Math.abs(item.iE || 0), 'A')}</span></div>
+      <div class="kv"><span>V Colector-Emisor (V_CE):</span><span>${formatUnit(item.vCE || 0, 'V')}</span></div>
+      <div class="kv"><span>V Base-Emisor (V_BE):</span><span>${formatUnit(item.vBE || 0, 'V')}</span></div>
+      <div class="kv"><span>Potencia Total (P):</span><span>${formatUnit(item.p || 0, 'W')}</span></div>`;
+  } else if (item.type === 'dc' || item.type === 'ac') {
+    html = `<h4>🔋 Fuente ${item.type.toUpperCase()}</h4>
+      <div class="kv"><span>Voltaje Instantáneo:</span><span>${formatUnit(item.dv || 0, 'V')}</span></div>
+      <div class="kv"><span>Corriente (I):</span><span>${formatUnit(Math.abs(item.i || 0), 'A')}</span></div>
+      <div class="kv"><span>Potencia (P):</span><span>${formatUnit(item.p || 0, 'W')}</span></div>`;
+  } else if (item.type === 'gnd') {
+    html = `<h4>⏚ Tierra de Referencia</h4><div class="kv"><span>Potencial:</span><span>0.00 V</span></div>`;
+  }
+  tooltip.innerHTML = html;
+}
+
+function updatePropPanel() {
+  const box = document.getElementById('propContent');
+  if (!selected) {
+    box.innerHTML = 'Haz clic sobre un componente o cable en el lienzo para editar sus parámetros.';
+    return;
+  }
+  if (selected.pts) {
+    box.innerHTML = `<p style="margin:0 0 8px"><b>Cable Ortogonal</b></p>
+      <p style="font-size:11px">Arrastra los círculos azules sobre el cable para desplazar sus tramos horizontal o verticalmente.</p>
+      <button onclick="deleteElement(selected)" style="width:100%; background:#7f1d1d;">Eliminar Cable</button>`;
+    return;
+  }
+
+  let html = '';
+  if (COMPONENT_LIBRARY.has(selected.type)) {
+    const def = COMPONENT_LIBRARY.get(selected.type);
+    if (def.properties) html += def.properties(selected);
+  } else if (selected.type === 'res' || selected.type === 'vres') {
+    html += `<div class="field">
+      <label>Resistencia (Ω): <b id="lblVal">${selected.r} Ω</b></label>
+      <input type="range" min="10" max="10000" step="10" value="${selected.r}"
+        oninput="selected.r=Number(this.value); document.getElementById('lblVal').textContent=this.value+' Ω'; document.getElementById('numVal').value=this.value;">
+      <input id="numVal" type="number" value="${selected.r}" style="margin-top:5px"
+        oninput="selected.r=Math.max(1,Number(this.value))">
+    </div>`;
+  } else if (selected.type === 'cap' || selected.type === 'vcap') {
+    const uf = (selected.c * 1e6).toFixed(1);
+    html += `<div class="field">
+      <label>Capacidad (µF): <b id="lblVal">${uf} µF</b></label>
+      <input type="range" min="1" max="500" step="1" value="${uf}"
+        oninput="selected.c=Number(this.value)*1e-6; document.getElementById('lblVal').textContent=this.value+' µF'">
+    </div>`;
+  } else if (selected.type === 'dc') {
+    html += `<div class="field">
+      <label>Voltaje DC (V):</label>
+      <input type="number" step="0.5" value="${selected.v}" oninput="selected.v=Number(this.value)">
+    </div>`;
+  } else if (selected.type === 'ac') {
+    html += `<div class="field">
+      <label>Voltaje Pico (V):</label>
+      <input type="number" step="1" value="${selected.v}" oninput="selected.v=Number(this.value)">
+    </div>
+    <div class="field">
+      <label>Frecuencia (Hz):</label>
+      <input type="number" step="5" value="${selected.freq}" oninput="selected.freq=Math.max(1,Number(this.value))">
+    </div>`;
+  }
+  html += `<div style="display:flex; gap:6px; margin-top:8px;">
+    <button onclick="rotateSelected()" style="flex:1">↻ Rotar</button>
+    <button onclick="deleteElement(selected)" style="flex:1; background:#7f1d1d;">🗑 Borrar</button>
+  </div>`;
+  box.innerHTML = html;
+}
+
+// ============================================================================
+// GUARDAR / RECUPERAR Y CIRCUITOS DE EJEMPLO
+// ============================================================================
+function saveCircuit() {
+  const data = JSON.stringify({comps, wires}, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'circuito_galileo.json';
+  a.click();
+}
+
+function loadCircuit(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const obj = JSON.parse(ev.target.result);
+      comps = obj.comps || [];
+      wires = obj.wires || [];
+      splitWiresAtJunctions();
+      selected = null;
+      updatePropPanel();
+    } catch (err) {
+      alert('Archivo JSON no válido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  comps = []; wires = []; selected = null; updatePropPanel();
+}
+
+function loadPreset(name) {
+  clearAll();
+  if (name === 'npn') {
+    comps = [
+      {id:'vcc', type:'dc', x:160, y:220, rot:1, v:12},
+      {id:'g1', type:'gnd', x:160, y:320, rot:0},
+      {id:'rb', type:'vres', x:260, y:240, rot:0, r:4700},
+      {id:'rc', type:'res', x:380, y:140, rot:1, r:470},
+      {id:'q1', type:'npn', x:360, y:240, rot:0},
+      {id:'g2', type:'gnd', x:380, y:340, rot:0}
+    ];
+    wires = [
+      {id:'w1', pts:[{x:160,y:260},{x:160,y:300}], v:0, i:0},
+      {id:'w2', pts:[{x:160,y:180},{x:160,y:80},{x:380,y:80},{x:380,y:100}], v:0, i:0},
+      {id:'w3', pts:[{x:160,y:140},{x:220,y:140},{x:220,y:240}], v:0, i:0},
+      {id:'w4', pts:[{x:300,y:240},{x:320,y:240}], v:0, i:0},
+      {id:'w5', pts:[{x:380,y:180},{x:380,y:200}], v:0, i:0},
+      {id:'w6', pts:[{x:380,y:280},{x:380,y:320}], v:0, i:0}
+    ];
+  } else if (name === 'pnp') {
+    comps = [
+      {id:'vcc', type:'dc', x:160, y:220, rot:1, v:12},
+      {id:'g1', type:'gnd', x:160, y:320, rot:0},
+      {id:'q1', type:'pnp', x:360, y:200, rot:2},
+      {id:'rb', type:'vres', x:260, y:200, rot:0, r:10000},
+      {id:'rc', type:'res', x:340, y:300, rot:1, r:1000},
+      {id:'g2', type:'gnd', x:340, y:380, rot:0}
+    ];
+    wires = [
+      {id:'w1', pts:[{x:160,y:260},{x:160,y:300}], v:0, i:0},
+      {id:'w2', pts:[{x:160,y:180},{x:160,y:120},{x:340,y:120},{x:340,y:160}], v:0, i:0},
+      {id:'w3', pts:[{x:300,y:200},{x:400,y:200}], v:0, i:0},
+      {id:'w4', pts:[{x:220,y:200},{x:200,y:200},{x:200,y:300},{x:160,y:300}], v:0, i:0},
+      {id:'w5', pts:[{x:340,y:240},{x:340,y:260}], v:0, i:0},
+      {id:'w6', pts:[{x:340,y:340},{x:340,y:360}], v:0, i:0}
+    ];
+  } else if (name === 'rect') {
+    comps = [
+      {id:'ac1', type:'ac', x:160, y:220, rot:1, v:15, freq:5},
+      {id:'g1', type:'gnd', x:160, y:320, rot:0},
+      {id:'d1', type:'diode', x:260, y:160, rot:0},
+      {id:'c1', type:'vcap', x:360, y:220, rot:1, c:47e-6},
+      {id:'r1', type:'vres', x:460, y:220, rot:1, r:1000}
+    ];
+    wires = [
+      {id:'w1', pts:[{x:160,y:180},{x:160,y:160},{x:220,y:160}], v:0, i:0},
+      {id:'w2', pts:[{x:300,y:160},{x:460,y:160},{x:460,y:180}], v:0, i:0},
+      {id:'w3', pts:[{x:360,y:160},{x:360,y:180}], v:0, i:0},
+      {id:'w4', pts:[{x:160,y:260},{x:160,y:300}], v:0, i:0},
+      {id:'w5', pts:[{x:460,y:260},{x:460,y:300},{x:160,y:300}], v:0, i:0},
+      {id:'w6', pts:[{x:360,y:260},{x:360,y:300}], v:0, i:0}
+    ];
+  } else if (name === 'zener_reg') {
+    if (!COMPONENT_LIBRARY.has('zener')) {
+      alert('Carga primero la librería "lib_zener.js" (o asegúrate de que esté en la misma carpeta).');
+      return;
+    }
+    comps = [
+      {id:'vcc', type:'dc', x:160, y:220, rot:1, v:12},
+      {id:'g1', type:'gnd', x:160, y:320, rot:0},
+      {id:'rs', type:'vres', x:260, y:160, rot:0, r:220},
+      {id:'dz', type:'zener', x:360, y:220, rot:3, vz:5.1},
+      {id:'rl', type:'res', x:460, y:220, rot:1, r:1000}
+    ];
+    wires = [
+      {id:'w1', pts:[{x:160,y:180},{x:160,y:160},{x:220,y:160}], v:0, i:0},
+      {id:'w2', pts:[{x:300,y:160},{x:460,y:160},{x:460,y:180}], v:0, i:0},
+      {id:'w3', pts:[{x:360,y:160},{x:360,y:180}], v:0, i:0},
+      {id:'w4', pts:[{x:160,y:260},{x:160,y:300}], v:0, i:0},
+      {id:'w5', pts:[{x:460,y:260},{x:460,y:300},{x:160,y:300}], v:0, i:0},
+      {id:'w6', pts:[{x:360,y:260},{x:360,y:300}], v:0, i:0}
+    ];
+  }
+  splitWiresAtJunctions();
+}
+
+loadPreset('npn');
+
+function loop() {
+  if (simRunning) {
+    for (let i = 0; i < 4; i++) stepSimulation();
+    if (showCurrent) animOffset += 0.6;
+    if (hovered) {
+      const r = tooltip.getBoundingClientRect();
+      updateTooltip(r.left - 16, r.top - 16, hovered);
+    }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+<!-- ==========================================================================
+     DECLARACIÓN DE LIBRERÍAS EXTERNAS EN LA MISMA CARPETA
+     Añade aquí una línea <script src="nombre_libreria.js"></script> por cada
+     elemento que diseñes.
+     ========================================================================== -->
+<script src="lib_zener.js"></script>
+
+</body>
+</html>
